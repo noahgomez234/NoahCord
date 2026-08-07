@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NoahCord — Premium Web Platform</title>
+  <title>NoahCord — Premium Messaging Platform</title>
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -32,9 +31,9 @@
           },
           animation: {
             'bounce-subtle': 'bounce 2s infinite',
-            'fade-in': 'fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-            'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-            'slide-left': 'slideLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            'fade-in': 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            'slide-up': 'slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            'slide-left': 'slideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
           },
           keyframes: {
             fadeIn: {
@@ -42,11 +41,11 @@
               '100%': { opacity: '1', transform: 'scale(1)' },
             },
             slideUp: {
-              '0%': { opacity: '0', transform: 'translateY(12px)' },
+              '0%': { opacity: '0', transform: 'translateY(10px)' },
               '100%': { opacity: '1', transform: 'translateY(0)' },
             },
             slideLeft: {
-              '0%': { opacity: '0', transform: 'translateX(20px)' },
+              '0%': { opacity: '0', transform: 'translateX(16px)' },
               '100%': { opacity: '1', transform: 'translateX(0)' },
             }
           }
@@ -127,14 +126,16 @@
     }
 
     .glass-panel {
-      background: rgba(15, 23, 42, 0.7);
+      background: rgba(15, 23, 42, 0.75);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--color-border);
     }
 
-    .glow-accent {
-      box-shadow: 0 0 24px -4px var(--color-accent);
+    .glass-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--color-border);
     }
 
     ::-webkit-scrollbar {
@@ -156,7 +157,7 @@
       if (errDiv) {
         errDiv.style.display = 'block';
         errDiv.innerHTML = '<div style="padding:20px; background:#090d16; color:#f87171; font-family:monospace; z-index:9999; position:fixed; inset:0;">' +
-          '<h2>NoahCord Handled Exception</h2>' +
+          '<h2>NoahCord Application Handled Error</h2>' +
           '<p>' + msg + '</p>' +
           '<p>Line: ' + line + ' | Col: ' + col + '</p>' +
           '<button onclick="location.reload()" style="background:#0ea5e9;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;margin-top:12px;">Reload Application</button>' +
@@ -174,19 +175,19 @@
       <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-2xl animate-pulse mb-4 shadow-xl shadow-sky-500/30">
         NC
       </div>
-      <p class="text-gray-400 font-medium text-sm animate-pulse">Loading NoahCord Experience...</p>
+      <p class="text-gray-400 font-medium text-sm animate-pulse">Initializing NoahCord Workspace...</p>
     </div>
   </div>
 
   <script type="text/babel">
     const { useState, useEffect, useRef, createContext, useContext } = React;
 
-    // --- Supabase Configuration ---
+    // --- Live Supabase Client Setup ---
     const SUPABASE_URL = "https://hcmglicybaitjqwkqice.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbWdsaWN5YmFpdGpxd2txaWNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMTAzMzAsImV4cCI6MjEwMTY4NjMzMH0.oIovdQqvUEKiAAfhkT9-sRCYNyjmcWCM-jglidYVA-4";
     const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
-    // --- Icon Helper ---
+    // --- Icon Component ---
     const Icon = ({ name, size = 18, className = "" }) => {
       const icons = {
         hash: <path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18" />,
@@ -206,12 +207,16 @@
         pin: <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />,
         paperclip: <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />,
         volume2: <g><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" /></g>,
-        mic: <g><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" /></g>,
-        micOff: <g><line x1="1" y1="1" x2="23" y2="23" /><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6" /><path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23M12 19v4M8 23h8" /></g>,
         sidebar: <g><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="3" x2="9" y2="21" /></g>,
         chevronDown: <polyline points="6 9 12 15 18 9" />,
         chevronRight: <polyline points="9 18 15 12 9 6" />,
-        compass: <g><circle cx="12" cy="12" r="10" /><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" /></g>,
+        edit: <g><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></g>,
+        camera: <g><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></g>,
+        image: <g><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></g>,
+        smile: <g><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" /></g>,
+        sticker: <g><path d="M12 2a10 10 0 1010 10A10 10 0 0012 2zm0 18a8 8 0 118-8 8 8 0 01-8 8z" /></g>,
+        gif: <g><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M8 10H6v4h2v-2H7M12 10v4M15 10h3v1.5h-2v1H18V14h-3" /></g>,
+        plus: <g><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></g>
       };
 
       return (
@@ -220,12 +225,6 @@
         </svg>
       );
     };
-
-    // --- Seed Accounts & Data ---
-    const SEED_ACCOUNTS = [
-      { id: 'usr-noah', username: 'Noah_', displayName: 'Noah_ (Fleet Admin)', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', password: 'admin123', role: 'admin', customStatus: '⚓ Fleet Captain' },
-      { id: 'usr-alex', username: 'alex_sailor', displayName: 'Alex Mercer', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', password: 'sailor123', role: 'member', customStatus: '⛵ Cruising general' }
-    ];
 
     const INITIAL_CATEGORIES = [
       {
@@ -246,55 +245,111 @@
       }
     ];
 
-    const INITIAL_MESSAGES = {
-      'chan-general': [
-        { id: 'm1', senderId: 'usr-noah', senderName: 'Noah_', senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', content: 'Welcome to **Sailors** ⚓! Everyone is automatically onboarded here.', timestamp: '12:00 PM' },
-        { id: 'm2', senderId: 'usr-noah', senderName: 'Noah_', senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', content: 'Notice how consecutive messages from the same sender are grouped tightly together!', timestamp: '12:01 PM' }
-      ]
-    };
-
-    // --- Context & State Provider ---
     const AppContext = createContext(null);
 
     const AppProvider = ({ children }) => {
-      const [accounts, setAccounts] = useState(() => {
-        const saved = localStorage.getItem('noahcord_accounts');
-        return saved ? JSON.parse(saved) : SEED_ACCOUNTS;
-      });
-
-      // No default login! Users start unauthenticated (null)
-      const [currentUser, setCurrentUser] = useState(() => {
-        const saved = localStorage.getItem('noahcord_active_user');
-        return saved ? JSON.parse(saved) : null;
-      });
-
+      // Unauthenticated initial state: currentUser starts STRICTLY NULL
+      const [currentUser, setCurrentUser] = useState(null);
+      const [accounts, setAccounts] = useState([]);
       const [theme, setTheme] = useState(() => localStorage.getItem('noahcord_theme') || 'midnight');
-      const [categories, setCategories] = useState(() => {
-        const saved = localStorage.getItem('noahcord_categories');
-        return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
-      });
-
+      const [categories, setCategories] = useState(INITIAL_CATEGORIES);
       const [activeChannelId, setActiveChannelId] = useState('chan-general');
-      const [messages, setMessages] = useState(INITIAL_MESSAGES);
+      const [messages, setMessages] = useState({});
       const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
-      const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+      const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
       const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
       const [logoClickCount, setLogoClickCount] = useState(0);
       const [toastMsg, setToastMsg] = useState(null);
       const [activeVoiceCall, setActiveVoiceCall] = useState(null);
 
+      // Check Active Supabase Session on Boot
       useEffect(() => {
-        localStorage.setItem('noahcord_accounts', JSON.stringify(accounts));
-      }, [accounts]);
+        if (!supabase) return;
+        
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            fetchUserProfile(session.user.id);
+          }
+        });
 
-      useEffect(() => {
-        if (currentUser) localStorage.setItem('noahcord_active_user', JSON.stringify(currentUser));
-        else localStorage.removeItem('noahcord_active_user');
-      }, [currentUser]);
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) {
+            fetchUserProfile(session.user.id);
+          } else {
+            setCurrentUser(null);
+          }
+        });
 
+        return () => subscription.unsubscribe();
+      }, []);
+
+      const fetchUserProfile = async (userId) => {
+        const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        if (data) {
+          setCurrentUser({
+            id: data.id,
+            username: data.username,
+            displayName: data.display_name,
+            avatar: data.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+            banner: data.banner_url || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800',
+            bio: data.bio || 'Cruising NoahCord waters.',
+            pronouns: data.pronouns || 'they/them',
+            role: data.role || (data.username === 'Noah_' ? 'admin' : 'member'),
+            status: data.status || 'online',
+            customStatus: data.custom_status || (data.username === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor')
+          });
+        }
+      };
+
+      // Load Messages & Sync Realtime with Supabase
       useEffect(() => {
-        localStorage.setItem('noahcord_categories', JSON.stringify(categories));
-      }, [categories]);
+        if (!currentUser || !supabase) return;
+
+        const loadMessagesAndProfiles = async () => {
+          const { data: profs } = await supabase.from('profiles').select('*');
+          if (profs) {
+            setAccounts(profs.map(p => ({
+              id: p.id,
+              username: p.username,
+              displayName: p.display_name,
+              avatar: p.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+              role: p.role,
+              customStatus: p.custom_status || '⛵ Sailor'
+            })));
+          }
+
+          const { data: msgs } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
+          if (msgs) {
+            const grouped = {};
+            msgs.forEach(m => {
+              if (!grouped[m.channel_id]) grouped[m.channel_id] = [];
+              const sender = profs?.find(p => p.id === m.sender_id);
+              grouped[m.channel_id].push({
+                id: m.id,
+                senderId: m.sender_id,
+                senderName: sender ? sender.display_name : 'Sailor',
+                senderAvatar: sender?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+                content: m.content,
+                timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                poll: m.poll_data
+              });
+            });
+            setMessages(grouped);
+          }
+        };
+
+        loadMessagesAndProfiles();
+
+        const channel = supabase.channel('public:messages')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+            loadMessagesAndProfiles();
+          })
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(channel);
+        };
+      }, [currentUser, activeChannelId]);
 
       useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
@@ -306,7 +361,7 @@
         setTimeout(() => setToastMsg(null), 3500);
       };
 
-      // Noah_ 10-Click Admin Easter Egg
+      // 10-Click Secret Logo Listener
       const handleLogoClick = () => {
         if (!currentUser) return;
         const newCount = logoClickCount + 1;
@@ -325,27 +380,40 @@
         }
       };
 
-      const logout = () => {
+      const logout = async () => {
+        if (supabase) await supabase.auth.signOut();
         setCurrentUser(null);
         triggerToast('Logged out successfully.');
       };
 
-      const sendMessage = (channelId, text, pollData = null) => {
-        if (!currentUser) return;
-        const newMsg = {
-          id: 'msg-' + Date.now(),
-          senderId: currentUser.id,
-          senderName: currentUser.displayName,
-          senderAvatar: currentUser.avatar,
-          content: text,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          poll: pollData
-        };
+      const updateProfile = async (updates) => {
+        const updated = { ...currentUser, ...updates };
+        setCurrentUser(updated);
 
-        setMessages(prev => ({
-          ...prev,
-          [channelId]: [...(prev[channelId] || []), newMsg]
-        }));
+        if (supabase && currentUser.id) {
+          await supabase.from('profiles').update({
+            display_name: updates.displayName,
+            username: updates.username,
+            bio: updates.bio,
+            pronouns: updates.pronouns,
+            avatar_url: updates.avatar,
+            banner_url: updates.banner,
+            custom_status: updates.customStatus,
+            status: updates.status
+          }).eq('id', currentUser.id);
+        }
+        triggerToast('Profile updated successfully!');
+      };
+
+      const sendMessage = async (channelId, text, pollData = null) => {
+        if (!currentUser || !supabase) return;
+
+        await supabase.from('messages').insert({
+          channel_id: channelId,
+          sender_id: currentUser.id,
+          content: text,
+          poll_data: pollData
+        });
       };
 
       const addChannel = (categoryName, channelName, desc = '') => {
@@ -361,24 +429,15 @@
         triggerToast(`Channel #${formatted} created!`);
       };
 
-      const deleteChannel = (channelId) => {
-        setCategories(prev => prev.map(cat => ({
-          ...cat,
-          channels: cat.channels.filter(c => c.id !== channelId)
-        })));
-        triggerToast('Channel deleted.');
-      };
-
       return (
         <AppContext.Provider value={{
-          accounts, setAccounts,
-          currentUser, setCurrentUser, logout,
+          accounts, currentUser, setCurrentUser, logout, updateProfile,
           theme, setTheme,
-          categories, setCategories, addChannel, deleteChannel,
+          categories, addChannel,
           activeChannelId, setActiveChannelId,
           messages, sendMessage,
           isAdminModalOpen, setIsAdminModalOpen,
-          isSettingsOpen, setIsSettingsOpen,
+          isProfileModalOpen, setIsProfileModalOpen,
           rightSidebarOpen, setRightSidebarOpen,
           activeVoiceCall, setActiveVoiceCall,
           handleLogoClick, logoClickCount,
@@ -391,48 +450,55 @@
 
     const useApp = () => useContext(AppContext);
 
-    // --- Component: Sign Up / Login Screen ---
+    // --- Sign Up & Login Modal Screen ---
     const AuthModal = () => {
-      const { accounts, setAccounts, setCurrentUser, triggerToast } = useApp();
+      const { triggerToast } = useApp();
       const [isSignUp, setIsSignUp] = useState(true);
       const [username, setUsername] = useState('');
       const [displayName, setDisplayName] = useState('');
       const [password, setPassword] = useState('');
       const [errorMsg, setErrorMsg] = useState('');
+      const [loading, setLoading] = useState(false);
 
-      const cleanUsername = username.trim();
-      const isTaken = accounts.some(a => a.username.toLowerCase() === cleanUsername.toLowerCase());
-      const isAvailable = cleanUsername.length >= 3 && !isTaken;
-
-      const handleSubmit = (e) => {
+      const handleSubmit = async (e) => {
         e.preventDefault();
         setErrorMsg('');
+        setLoading(true);
 
-        if (isSignUp) {
-          if (cleanUsername.length < 3) return setErrorMsg('Username must be at least 3 characters.');
-          if (isTaken) return setErrorMsg(`Username @${cleanUsername} is taken!`);
-          if (password.length < 4) return setErrorMsg('Password must be at least 4 characters.');
+        const cleanUser = username.trim();
+        const email = `${cleanUser.toLowerCase()}@noahcord.com`;
 
-          const newUser = {
-            id: 'usr-' + Date.now(),
-            username: cleanUsername,
-            displayName: displayName.trim() || cleanUsername,
-            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-            password: password,
-            role: cleanUsername === 'Noah_' ? 'admin' : 'member',
-            customStatus: cleanUsername === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor'
-          };
+        try {
+          if (isSignUp) {
+            if (cleanUser.length < 3) throw new Error('Username must be at least 3 characters.');
+            if (password.length < 4) throw new Error('Password must be at least 4 characters.');
 
-          setAccounts(prev => [...prev, newUser]);
-          setCurrentUser(newUser);
-          triggerToast(`Welcome to Sailors ⚓, @${cleanUsername}!`);
-        } else {
-          const existing = accounts.find(a => a.username.toLowerCase() === cleanUsername.toLowerCase());
-          if (!existing) return setErrorMsg(`Account @${cleanUsername} not found.`);
-          if (existing.password !== password) return setErrorMsg('Incorrect password!');
+            const { data, error } = await supabase.auth.signUp({
+              email: email,
+              password: password,
+              options: {
+                data: {
+                  username: cleanUser,
+                  display_name: displayName.trim() || cleanUser
+                }
+              }
+            });
 
-          setCurrentUser(existing);
-          triggerToast(`Welcome back, @${existing.username}!`);
+            if (error) throw error;
+            triggerToast(`Account created! Joining Sailors ⚓...`);
+          } else {
+            const { data, error } = await supabase.auth.signInWithPassword({
+              email: email,
+              password: password
+            });
+
+            if (error) throw error;
+            triggerToast(`Logged in successfully!`);
+          }
+        } catch (err) {
+          setErrorMsg(err.message || 'Authentication error');
+        } finally {
+          setLoading(false);
         }
       };
 
@@ -472,14 +538,7 @@
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-gray-400 flex justify-between">
-                  <span>Username</span>
-                  {isSignUp && cleanUsername && (
-                    <span className={`text-[11px] ${isAvailable ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {isAvailable ? '✓ Available' : '✗ Taken'}
-                    </span>
-                  )}
-                </label>
+                <label className="text-xs font-semibold text-gray-400">Username</label>
                 <div className="relative mt-1">
                   <span className="absolute left-3 top-2.5 text-gray-500 text-sm">@</span>
                   <input
@@ -520,23 +579,24 @@
 
               <button
                 type="submit"
-                className="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm py-3 rounded-xl transition shadow-lg mt-2"
+                disabled={loading}
+                className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-sm py-3 rounded-xl transition shadow-lg mt-2"
               >
-                {isSignUp ? 'Create Account & Join Sailors ⚓' : 'Log In & Enter Sailors ⚓'}
+                {loading ? 'Authenticating...' : isSignUp ? 'Create Account & Join Sailors ⚓' : 'Log In & Enter Sailors ⚓'}
               </button>
             </form>
 
             <div className="text-center text-[11px] text-gray-500">
-              Admin clearance: Sign up as username <span className="text-sky-400 font-mono font-bold">Noah_</span>
+              Admin clearance: Sign up with username <span className="text-sky-400 font-mono font-bold">Noah_</span>
             </div>
           </div>
         </div>
       );
     };
 
-    // --- Component: Primary Left Server Navigation Bar ---
+    // --- Left Server Sidebar ---
     const ServerSidebar = () => {
-      const { handleLogoClick, setIsSettingsOpen } = useApp();
+      const { handleLogoClick, setIsProfileModalOpen } = useApp();
 
       return (
         <div className="w-18 md:w-20 bg-[#0f172a]/90 border-r border-white/10 flex flex-col items-center py-4 justify-between select-none z-20 glass-panel">
@@ -559,9 +619,9 @@
           </div>
 
           <button
-            onClick={() => setIsSettingsOpen(true)}
+            onClick={() => setIsProfileModalOpen(true)}
             className="p-3 text-gray-400 hover:text-white hover:bg-[#1e293b] rounded-2xl transition"
-            title="Settings & Themes"
+            title="Profile & Settings"
           >
             <Icon name="settings" size={20} />
           </button>
@@ -569,14 +629,10 @@
       );
     };
 
-    // --- Component: Channels Navigation Sidebar ---
+    // --- Channel Sidebar ---
     const ChannelListSidebar = () => {
-      const { categories, activeChannelId, setActiveChannelId, currentUser, setIsAdminModalOpen, setActiveVoiceCall, activeVoiceCall, logout } = useApp();
+      const { categories, activeChannelId, setActiveChannelId, currentUser, setIsAdminModalOpen, setIsProfileModalOpen, setActiveVoiceCall, activeVoiceCall, logout } = useApp();
       const [collapsedCat, setCollapsedCat] = useState({});
-
-      const toggleCategory = (catId) => {
-        setCollapsedCat(prev => ({ ...prev, [catId]: !prev[catId] }));
-      };
 
       return (
         <div className="w-60 md:w-64 bg-[#0f172a]/80 border-r border-white/10 flex flex-col h-full select-none glass-panel">
@@ -588,7 +644,7 @@
                   Sailors
                   <Icon name="shield" size={14} className="text-sky-400" />
                 </h2>
-                <p className="text-[10px] text-gray-400">Main Community Fleet</p>
+                <p className="text-[10px] text-gray-400">Official Fleet Server</p>
               </div>
             </div>
 
@@ -607,7 +663,7 @@
             {categories.map(cat => (
               <div key={cat.id}>
                 <div 
-                  onClick={() => toggleCategory(cat.id)}
+                  onClick={() => setCollapsedCat(prev => ({ ...prev, [cat.id]: !prev[cat.id] }))}
                   className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1 flex items-center justify-between cursor-pointer hover:text-gray-200"
                 >
                   <span className="flex items-center gap-1">
@@ -628,14 +684,10 @@
                           key={chan.id}
                           onClick={() => {
                             setActiveChannelId(chan.id);
-                            if (isVoice) {
-                              setActiveVoiceCall({ channelName: chan.name, muted: false, deafened: false });
-                            }
+                            if (isVoice) setActiveVoiceCall({ channelName: chan.name });
                           }}
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-sm transition ${
-                            isActive 
-                              ? 'bg-sky-500/20 text-white font-semibold border border-sky-500/30' 
-                              : 'text-gray-400 hover:bg-[#1e293b]/60 hover:text-gray-200'
+                            isActive ? 'bg-sky-500/20 text-white font-semibold border border-sky-500/30' : 'text-gray-400 hover:bg-[#1e293b]/60 hover:text-gray-200'
                           }`}
                         >
                           <div className="flex items-center gap-2 min-w-0">
@@ -652,20 +704,22 @@
             ))}
           </div>
 
-          {/* Active Voice Bar */}
           {activeVoiceCall && (
             <div className="p-3 bg-emerald-950/40 border-t border-emerald-500/30 text-xs space-y-2">
               <div className="flex items-center justify-between text-emerald-400 font-semibold">
-                <span className="flex items-center gap-1.5"><Icon name="volume2" size={14} /> Connected: {activeVoiceCall.channelName}</span>
+                <span className="flex items-center gap-1.5"><Icon name="volume2" size={14} /> Voice: {activeVoiceCall.channelName}</span>
                 <button onClick={() => setActiveVoiceCall(null)} className="hover:text-white"><Icon name="x" size={14} /></button>
               </div>
             </div>
           )}
 
-          {/* Bottom Logged In User Profile Banner */}
+          {/* Profile Quick Access Banner */}
           {currentUser && (
             <div className="p-3 bg-[#0f172a] border-t border-white/10 flex items-center justify-between">
-              <div className="flex items-center gap-2.5 min-w-0">
+              <div 
+                onClick={() => setIsProfileModalOpen(true)}
+                className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:opacity-80 transition"
+              >
                 <div className="relative">
                   <img src={currentUser.avatar} className="w-8 h-8 rounded-xl object-cover ring-1 ring-white/10" alt="" />
                   <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-[#0f172a]" />
@@ -679,11 +733,7 @@
                 </div>
               </div>
 
-              <button
-                onClick={logout}
-                className="p-1.5 text-gray-400 hover:text-rose-400 hover:bg-[#1e293b] rounded-lg transition"
-                title="Log Out"
-              >
+              <button onClick={logout} className="p-1.5 text-gray-400 hover:text-rose-400 hover:bg-[#1e293b] rounded-lg transition" title="Log Out">
                 <Icon name="logout" size={16} />
               </button>
             </div>
@@ -692,11 +742,12 @@
       );
     };
 
-    // --- Component: Main Chat Window (Compact Consecutive Messages) ---
+    // --- Chat Window (Ultra-Compact Consecutive Message Spacing) ---
     const ChatWindow = () => {
       const { categories, activeChannelId, messages, sendMessage, rightSidebarOpen, setRightSidebarOpen } = useApp();
       const [input, setInput] = useState('');
-      const [showSlashMenu, setShowSlashMenu] = useState(false);
+      const [showGiphy, setShowGiphy] = useState(false);
+      const [showStickers, setShowStickers] = useState(false);
       const chatEndRef = useRef(null);
 
       let activeChan = null;
@@ -718,19 +769,20 @@
 
         if (input.startsWith('/poll')) {
           const parts = input.replace('/poll', '').split('|').map(s => s.trim()).filter(Boolean);
-          const question = parts[0] || 'Community Poll';
-          const options = parts.slice(1).length > 0 ? parts.slice(1) : ['Option A', 'Option B'];
-          sendMessage(activeChan.id, `📊 **POLL:** ${question}`, { question, options });
+          sendMessage(activeChan.id, `📊 **POLL:** ${parts[0] || 'Poll'}`, { question: parts[0] || 'Poll', options: parts.slice(1) });
+        } else if (input === '/shrug') {
+          sendMessage(activeChan.id, '¯\\_(ツ)_/¯');
+        } else if (input === '/tableflip') {
+          sendMessage(activeChan.id, '(╯°□°)╯︵ ┻━┻');
         } else {
           sendMessage(activeChan.id, input);
         }
-
         setInput('');
-        setShowSlashMenu(false);
       };
 
       return (
         <div className="flex-1 flex flex-col h-full bg-[#080b12] relative overflow-hidden">
+          {/* Top Header */}
           <div className="h-16 border-b border-white/10 px-6 flex items-center justify-between bg-[#0f172a]/40 backdrop-blur-md">
             <div className="flex items-center gap-2">
               <Icon name={activeChan?.type === 'voice' ? 'volume2' : 'hash'} className="text-sky-400" size={22} />
@@ -740,40 +792,42 @@
               </div>
             </div>
 
-            <button 
-              onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-              className={`p-2 rounded-xl transition ${rightSidebarOpen ? 'bg-sky-500/20 text-sky-400' : 'text-gray-400 hover:text-white'}`}
-            >
+            <button onClick={() => setRightSidebarOpen(!rightSidebarOpen)} className={`p-2 rounded-xl transition ${rightSidebarOpen ? 'bg-sky-500/20 text-sky-400' : 'text-gray-400 hover:text-white'}`}>
               <Icon name="sidebar" size={18} />
             </button>
           </div>
 
-          {/* Compact Grouped Message Stream */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-1">
+          {/* Continuous Message List with Ultra-Tight Spacing */}
+          <div className="flex-1 overflow-y-auto p-6">
             {chanMessages.map((msg, idx) => {
               const prevMsg = chanMessages[idx - 1];
               const isGrouped = prevMsg && prevMsg.senderId === msg.senderId;
 
-              return (
-                <div key={msg.id} className={`group relative flex gap-3 hover:bg-[#1e293b]/30 px-3 py-1 rounded-xl transition duration-150 ${isGrouped ? 'mt-0.5' : 'mt-3.5'}`}>
-                  {!isGrouped ? (
-                    <img src={msg.senderAvatar} className="w-9 h-9 rounded-xl object-cover ring-1 ring-white/10" alt="" />
-                  ) : (
-                    <div className="w-9 text-[10px] text-gray-600 text-right pr-2 opacity-0 group-hover:opacity-100 select-none pt-0.5">
+              if (isGrouped) {
+                return (
+                  <div key={msg.id} className="group relative flex items-start gap-3 hover:bg-white/[0.02] px-3 py-[1px] my-[1px] rounded-lg transition duration-150">
+                    <div className="w-9 shrink-0 text-[10px] text-gray-500/60 text-right pr-1 select-none opacity-0 group-hover:opacity-100 font-mono pt-0.5 leading-tight">
                       {msg.timestamp}
                     </div>
-                  )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-gray-300 leading-normal break-words">{msg.content}</div>
+                    </div>
+                  </div>
+                );
+              }
 
+              return (
+                <div key={msg.id} className="group relative flex items-start gap-3 hover:bg-white/[0.03] px-3 pt-2.5 pb-1 mt-4 rounded-xl transition duration-150 border-t border-white/[0.02]">
+                  <img src={msg.senderAvatar} className="w-9 h-9 rounded-xl object-cover ring-1 ring-white/10 shrink-0" alt="" />
                   <div className="flex-1 min-w-0">
-                    {!isGrouped && (
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="font-bold text-xs text-gray-200">{msg.senderName}</span>
-                        {msg.senderName.includes('Noah_') && <span className="bg-sky-500/20 text-sky-400 text-[10px] px-1.5 py-0.2 rounded font-semibold">Fleet Admin</span>}
-                        <span className="text-[10px] text-gray-500">{msg.timestamp}</span>
-                      </div>
-                    )}
-
-                    <div className="text-xs text-gray-300 leading-snug break-words">{msg.content}</div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-bold text-xs text-gray-200 hover:underline cursor-pointer">{msg.senderName}</span>
+                      {msg.senderName.includes('Noah_') && (
+                        <span className="bg-sky-500/20 text-sky-400 text-[10px] px-1.5 py-0.5 rounded font-semibold border border-sky-500/30">Fleet Admin</span>
+                      )}
+                      <span className="text-[10px] text-gray-500 font-medium">{msg.timestamp}</span>
+                    </div>
+                    <div className="text-xs text-gray-300 leading-normal break-words">{msg.content}</div>
 
                     {msg.poll && (
                       <div className="mt-2 bg-[#0f172a] border border-white/10 p-3 rounded-xl max-w-sm space-y-1">
@@ -793,32 +847,48 @@
             <div ref={chatEndRef} />
           </div>
 
+          {/* GIPHY & Sticker Drawers */}
+          {showGiphy && (
+            <div className="absolute bottom-20 right-6 bg-[#0f172a] border border-white/10 p-3 rounded-2xl shadow-2xl z-30 w-72 space-y-2 glass-panel">
+              <div className="text-xs font-bold text-gray-400 uppercase">GIPHY Search</div>
+              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                {[
+                  'https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif',
+                  'https://media.giphy.com/media/l0HlHJGHe3yAMhdQY/giphy.gif',
+                  'https://media.giphy.com/media/3o7TKsjRrfIPjeiVyM/giphy.gif'
+                ].map((gif, i) => (
+                  <img key={i} src={gif} onClick={() => { sendMessage(activeChan.id, gif); setShowGiphy(false); }} className="w-full h-20 object-cover rounded-xl cursor-pointer hover:scale-105 transition" alt="" />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Chat Input Dock */}
           <div className="p-4 bg-[#0f172a]/40 backdrop-blur-md border-t border-white/10">
             <form onSubmit={handleSend} className="flex items-center bg-[#0f172a] border border-white/10 rounded-2xl p-2 focus-within:border-sky-500 transition shadow-inner">
               <input
                 type="text"
                 value={input}
-                onChange={(e) => {
-                  setInput(e.target.value);
-                  setShowSlashMenu(e.target.value.startsWith('/'));
-                }}
-                placeholder={`Message #${activeChan?.name} in Sailors...`}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={`Message #${activeChan?.name} in Sailors... (Try /poll or /shrug)`}
                 className="flex-1 bg-transparent px-3 text-sm text-gray-100 placeholder-gray-500 focus:outline-none"
               />
-              <button
-                type="submit"
-                disabled={!input.trim()}
-                className="p-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white transition shadow-md"
-              >
-                <Icon name="send" size={16} />
-              </button>
+
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={() => { setShowGiphy(!showGiphy); setShowStickers(false); }} className="p-2 text-gray-400 hover:text-white rounded-xl">
+                  <Icon name="gif" size={18} />
+                </button>
+                <button type="submit" disabled={!input.trim()} className="p-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white transition shadow-md">
+                  <Icon name="send" size={16} />
+                </button>
+              </div>
             </form>
           </div>
         </div>
       );
     };
 
-    // --- Component: Right Sidebar (Members List) ---
+    // --- Right Sidebar ---
     const RightSidebar = () => {
       const { rightSidebarOpen, accounts } = useApp();
 
@@ -848,9 +918,130 @@
       );
     };
 
-    // --- Component: Admin Panel Modal (Noah_ Only) ---
+    // --- Complete User Profile Settings Modal ---
+    const ProfileModal = () => {
+      const { isProfileModalOpen, setIsProfileModalOpen, currentUser, updateProfile, theme, setTheme } = useApp();
+      
+      const [displayName, setDisplayName] = useState(currentUser?.displayName || '');
+      const [username, setUsername] = useState(currentUser?.username || '');
+      const [bio, setBio] = useState(currentUser?.bio || '');
+      const [pronouns, setPronouns] = useState(currentUser?.pronouns || '');
+      const [avatar, setAvatar] = useState(currentUser?.avatar || '');
+      const [banner, setBanner] = useState(currentUser?.banner || '');
+      const [customStatus, setCustomStatus] = useState(currentUser?.customStatus || '');
+      const [status, setStatus] = useState(currentUser?.status || 'online');
+
+      useEffect(() => {
+        if (currentUser) {
+          setDisplayName(currentUser.displayName || '');
+          setUsername(currentUser.username || '');
+          setBio(currentUser.bio || '');
+          setPronouns(currentUser.pronouns || '');
+          setAvatar(currentUser.avatar || '');
+          setBanner(currentUser.banner || '');
+          setCustomStatus(currentUser.customStatus || '');
+          setStatus(currentUser.status || 'online');
+        }
+      }, [currentUser]);
+
+      if (!isProfileModalOpen || !currentUser) return null;
+
+      const handleSave = (e) => {
+        e.preventDefault();
+        updateProfile({ displayName, username, bio, pronouns, avatar, banner, customStatus, status });
+        setIsProfileModalOpen(false);
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-[#0f172a] border border-white/10 w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl glass-panel flex flex-col max-h-[90vh]">
+            
+            {/* Header Banner Preview */}
+            <div className="h-28 relative bg-gradient-to-r from-sky-500 to-indigo-600">
+              {banner && <img src={banner} className="w-full h-full object-cover" alt="" />}
+              <button onClick={() => setIsProfileModalOpen(false)} className="absolute top-3 right-3 p-1.5 rounded-full bg-black/40 text-white hover:bg-black/60"><Icon name="x" size={18} /></button>
+            </div>
+
+            {/* Profile Avatar Overlay */}
+            <div className="px-6 relative -mt-10 mb-2 flex justify-between items-end">
+              <div className="relative">
+                <img src={avatar} className="w-20 h-20 rounded-2xl object-cover ring-4 ring-[#0f172a] shadow-xl" alt="" />
+                <span className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0f172a]" />
+              </div>
+              <div className="text-right">
+                <h3 className="font-bold text-gray-100 text-lg">{displayName}</h3>
+                <p className="text-xs text-gray-400">@{username}</p>
+              </div>
+            </div>
+
+            {/* Form Fields */}
+            <form onSubmit={handleSave} className="p-6 overflow-y-auto space-y-4 flex-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-400">Display Name</label>
+                  <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-100" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-400">Username</label>
+                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-100" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-gray-400">Pronouns</label>
+                  <input type="text" value={pronouns} onChange={(e) => setPronouns(e.target.value)} placeholder="he/him, she/her, they/them" className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-100" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-400">Status Type</label>
+                  <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-100">
+                    <option value="online">Online</option>
+                    <option value="idle">Idle</option>
+                    <option value="dnd">Do Not Disturb</option>
+                    <option value="offline">Invisible</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-400">Custom Status Tag</label>
+                <input type="text" value={customStatus} onChange={(e) => setCustomStatus(e.target.value)} placeholder="🚀 Cruising NoahCord" className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-100" />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-400">Avatar Image URL</label>
+                <input type="text" value={avatar} onChange={(e) => setAvatar(e.target.value)} className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-100" />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-400">Bio</label>
+                <textarea rows="2" value={bio} onChange={(e) => setBio(e.target.value)} className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-100" />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-400 mb-2 block">App Theme Preset</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['midnight', 'black', 'dark-blue', 'cyan-neon', 'pink'].map(t => (
+                    <button type="button" key={t} onClick={() => setTheme(t)} className={`p-2 rounded-xl border text-xs capitalize text-center ${theme === t ? 'border-sky-500 bg-sky-500/20 font-bold' : 'border-white/10'}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button type="button" onClick={() => setIsProfileModalOpen(false)} className="px-4 py-2 rounded-xl bg-[#1e293b] text-gray-300 text-xs">Cancel</button>
+                <button type="submit" className="px-6 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold shadow-lg">Save Profile Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    };
+
+    // --- Noah_ Admin Panel ---
     const AdminPanelModal = () => {
-      const { isAdminModalOpen, setIsAdminModalOpen, categories, addChannel, deleteChannel, currentUser } = useApp();
+      const { isAdminModalOpen, setIsAdminModalOpen, categories, addChannel, currentUser } = useApp();
       const [catName, setCatName] = useState('Deck Operations');
       const [chanName, setChanName] = useState('');
 
@@ -887,36 +1078,7 @@
       );
     };
 
-    // --- Settings Modal ---
-    const SettingsModal = () => {
-      const { isSettingsOpen, setIsSettingsOpen, theme, setTheme, triggerToast } = useApp();
-
-      if (!isSettingsOpen) return null;
-
-      return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f172a] border border-white/10 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 glass-panel">
-            <div className="flex items-center justify-between pb-2 border-b border-white/10">
-              <h2 className="font-extrabold text-lg text-gray-100">Theme Selector</h2>
-              <button onClick={() => setIsSettingsOpen(false)} className="text-gray-400 hover:text-white"><Icon name="x" size={20} /></button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {['midnight', 'black', 'dark-blue', 'cyan-neon', 'pink'].map(t => (
-                <button
-                  key={t}
-                  onClick={() => { setTheme(t); triggerToast(`Theme: ${t}`); }}
-                  className={`p-3 rounded-xl border capitalize text-xs text-left ${theme === t ? 'border-sky-500 bg-sky-500/10 font-bold' : 'border-white/10'}`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-    };
-
-    // --- Main Layout ---
+    // --- Main App Root ---
     const MainApp = () => {
       const { currentUser, toastMsg } = useApp();
 
@@ -939,7 +1101,7 @@
                 <RightSidebar />
               </div>
               <AdminPanelModal />
-              <SettingsModal />
+              <ProfileModal />
             </>
           )}
         </div>
