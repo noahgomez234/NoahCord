@@ -166,7 +166,7 @@
       <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-2xl animate-pulse mb-4 shadow-xl shadow-sky-500/30">
         NC
       </div>
-      <p class="text-gray-400 font-medium text-sm animate-pulse">Initializing NoahCord Workspace...</p>
+      <p class="text-gray-400 font-medium text-sm animate-pulse">Connecting to NoahCord Realtime Fleet...</p>
     </div>
   </div>
 
@@ -233,15 +233,10 @@
       { id: 'usr-alex', username: 'alex_sailor', displayName: 'Alex Mercer', password: 'sailor123', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', role: 'member', customStatus: '⛵ Sailor' }
     ];
 
-    const DEFAULT_MESSAGES = {
-      'chan-general': [
-        { id: 'm1', senderId: 'usr-noah', senderName: 'Noah_', senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', content: 'Welcome to **Sailors** ⚓! Send a message below to test chat.', timestamp: '12:00 PM' }
-      ]
-    };
-
     const AppContext = createContext(null);
 
     const AppProvider = ({ children }) => {
+      // Session Persistence
       const [currentUser, setCurrentUser] = useState(() => {
         const saved = localStorage.getItem('noahcord_active_session');
         return saved ? JSON.parse(saved) : null;
@@ -256,17 +251,13 @@
       const [categories, setCategories] = useState(INITIAL_CATEGORIES);
       const [activeChannelId, setActiveChannelId] = useState('chan-general');
 
-      const [messages, setMessages] = useState(() => {
-        const saved = localStorage.getItem('noahcord_saved_messages');
-        return saved ? JSON.parse(saved) : DEFAULT_MESSAGES;
-      });
+      // Message State
+      const [messages, setMessages] = useState({});
 
       const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
       const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-      
-      // Mobile Drawer States
       const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-      const [rightSidebarOpen, setRightSidebarOpen] = useState(false); // Default closed on mobile
+      const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
 
       const [logoClickCount, setLogoClickCount] = useState(0);
       const [toastMsg, setToastMsg] = useState(null);
@@ -284,9 +275,96 @@
         }
       }, [currentUser]);
 
+      // Restore Supabase Auth Session
       useEffect(() => {
-        localStorage.setItem('noahcord_saved_messages', JSON.stringify(messages));
-      }, [messages]);
+        if (!supabase) return;
+
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            fetchUserProfile(session.user.id);
+          }
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) {
+            fetchUserProfile(session.user.id);
+          }
+        });
+
+        return () => subscription.unsubscribe();
+      }, []);
+
+      const fetchUserProfile = async (userId) => {
+        const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        if (data) {
+          const userObj = {
+            id: data.id,
+            username: data.username,
+            displayName: data.display_name,
+            avatar: data.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+            banner: data.banner_url || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800',
+            bio: data.bio || 'Cruising NoahCord waters.',
+            pronouns: data.pronouns || 'they/them',
+            role: data.role || (data.username === 'Noah_' ? 'admin' : 'member'),
+            status: data.status || 'online',
+            customStatus: data.custom_status || (data.username === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor')
+          };
+          setCurrentUser(userObj);
+        }
+      };
+
+      // Realtime Database & Multi-Device Cross Sync with Supabase
+      useEffect(() => {
+        if (!currentUser || !supabase) return;
+
+        const loadMessagesAndProfiles = async () => {
+          const { data: profs } = await supabase.from('profiles').select('*');
+          if (profs && profs.length > 0) {
+            setAccounts(profs.map(p => ({
+              id: p.id,
+              username: p.username,
+              displayName: p.display_name,
+              avatar: p.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+              role: p.role,
+              customStatus: p.custom_status || '⛵ Sailor'
+            })));
+          }
+
+          const { data: msgs } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
+          if (msgs) {
+            const grouped = {};
+            msgs.forEach(m => {
+              const chanKey = m.channel_id || 'chan-general';
+              if (!grouped[chanKey]) grouped[chanKey] = [];
+              
+              const sender = profs?.find(p => p.id === m.sender_id);
+              grouped[chanKey].push({
+                id: m.id,
+                senderId: m.sender_id,
+                senderName: sender ? sender.display_name : 'Sailor',
+                senderAvatar: sender?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+                content: m.content,
+                timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                poll: m.poll_data
+              });
+            });
+            setMessages(grouped);
+          }
+        };
+
+        loadMessagesAndProfiles();
+
+        // Subscribe to Supabase Realtime broadcast
+        const channel = supabase.channel('messages_realtime_channel')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+            loadMessagesAndProfiles();
+          })
+          .subscribe();
+
+        return () => {
+          supabase.removeChannel(channel);
+        };
+      }, [currentUser, activeChannelId]);
 
       useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
@@ -344,6 +422,7 @@
         triggerToast('Profile updated!');
       };
 
+      // Multi-device Cross Sync Send Message
       const sendMessage = async (channelId, text, pollData = null) => {
         if (!currentUser) return;
 
@@ -357,21 +436,23 @@
           poll: pollData
         };
 
+        // 1. Instant Optimistic Render
         setMessages(prev => ({
           ...prev,
           [channelId]: [...(prev[channelId] || []), newMsg]
         }));
 
+        // 2. Broadcast to Supabase DB for Multi-Device Realtime sync
         if (supabase && currentUser.id) {
-          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(channelId);
           const payload = {
+            channel_id: channelId, // Saved as TEXT so strings like 'chan-general' work!
             sender_id: currentUser.id,
             content: text,
             poll_data: pollData
           };
-          if (isUUID) payload.channel_id = channelId;
 
-          await supabase.from('messages').insert(payload);
+          const { error } = await supabase.from('messages').insert(payload);
+          if (error) console.warn('Supabase DB Sync Note:', error.message);
         }
       };
 
@@ -411,7 +492,7 @@
 
     const useApp = () => useContext(AppContext);
 
-    // --- Strict Sign Up / Login Screen ---
+    // --- Sign Up / Login Screen ---
     const AuthModal = () => {
       const { accounts, setAccounts, setCurrentUser, triggerToast } = useApp();
       const [isSignUp, setIsSignUp] = useState(true);
@@ -624,7 +705,7 @@
       const [collapsedCat, setCollapsedCat] = useState({});
 
       return (
-        <div className="w-56 md:w-64 bg-[#0f172a]/95 border-r border-white/10 flex flex-col h-full select-none glass-panel">
+        <div className="w-56 md:w-64 bg-[#0f172a]/80 border-r border-white/10 flex flex-col h-full select-none glass-panel">
           <div className="h-16 px-4 border-b border-white/10 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-2">
               <span className="text-2xl">⚓</span>
@@ -673,7 +754,7 @@
                           key={chan.id}
                           onClick={() => {
                             setActiveChannelId(chan.id);
-                            setMobileMenuOpen(false); // Auto-close mobile drawer on selection
+                            setMobileMenuOpen(false);
                             if (isVoice) setActiveVoiceCall({ channelName: chan.name });
                           }}
                           className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-sm transition ${
@@ -771,10 +852,9 @@
 
       return (
         <div className="flex-1 flex flex-col h-full bg-[#080b12] relative overflow-hidden w-full">
-          {/* Mobile + Desktop Responsive Header */}
+          {/* Header */}
           <div className="h-16 border-b border-white/10 px-4 md:px-6 flex items-center justify-between bg-[#0f172a]/40 backdrop-blur-md">
             <div className="flex items-center gap-2 min-w-0">
-              {/* Mobile Hamburger Button */}
               <button 
                 onClick={() => setMobileMenuOpen(true)} 
                 className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-[#1e293b] md:hidden shrink-0"
@@ -844,7 +924,7 @@
             <div ref={chatEndRef} />
           </div>
 
-          {/* GIPHY Search Drawer */}
+          {/* GIPHY Drawer */}
           {showGiphy && (
             <div className="absolute bottom-20 right-4 md:right-6 bg-[#0f172a] border border-white/10 p-3 rounded-2xl shadow-2xl z-30 w-72 space-y-2 glass-panel">
               <div className="text-xs font-bold text-gray-400 uppercase">GIPHY Search</div>
@@ -860,7 +940,7 @@
             </div>
           )}
 
-          {/* Touch-Friendly Chat Input Bar */}
+          {/* Chat Input Dock */}
           <div className="p-3 md:p-4 bg-[#0f172a]/40 backdrop-blur-md border-t border-white/10 pb-safe">
             <form onSubmit={handleSend} className="flex items-center bg-[#0f172a] border border-white/10 rounded-2xl p-1.5 md:p-2 focus-within:border-sky-500 transition shadow-inner">
               <input
@@ -885,7 +965,7 @@
       );
     };
 
-    // --- Right Sidebar Component ---
+    // --- Right Sidebar ---
     const RightSidebar = () => {
       const { accounts } = useApp();
 
@@ -1094,7 +1174,7 @@
                 />
               )}
 
-              {/* Combined Left Sidebars */}
+              {/* Combined Left Sidebars Drawer */}
               <div className={`fixed inset-y-0 left-0 z-40 flex h-full transition-transform duration-300 md:relative md:translate-x-0 ${
                 mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
               }`}>
@@ -1102,7 +1182,7 @@
                 <ChannelListSidebar />
               </div>
 
-              {/* Main Workspace */}
+              {/* Main Workspace Workspace */}
               <div className="flex-1 flex h-full overflow-hidden w-full">
                 <ChatWindow />
 
@@ -1114,7 +1194,7 @@
                   />
                 )}
 
-                {/* Right Member Sidebar */}
+                {/* Right Member Sidebar Drawer */}
                 <div className={`fixed inset-y-0 right-0 z-40 h-full transition-transform duration-300 md:relative md:translate-x-0 ${
                   rightSidebarOpen ? 'translate-x-0 shadow-2xl' : 'translate-x-full md:hidden'
                 }`}>
