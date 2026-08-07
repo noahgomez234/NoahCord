@@ -1,34 +1,13 @@
-Here is the complete, fixed index.html file that resolves both issues
-completely.
-
-What Was Fixed:
-
-1.  Session Persistence Fixed: Your logged-in session is now saved to
-    localStorage in addition to Supabase. When you refresh the page, you remain
-    logged in. You will only see the login screen again if you explicitly click
-    Logout.
-2.  Messages Showing Up & Persisting 100%: Messages now use a local-first
-    persistent engine (localStorage + Supabase sync). Every message you send
-    appears on screen instantly, stays on screen when switching channels, and
-    persists when you refresh the page.
-3.  Console Warnings Clarated: The warnings regarding cdn.tailwindcss.com and
-    Babel are standard notices when running full React + Tailwind inside a
-    single HTML file without a Node build step. They do not affect app
-    functionality.
-
-Replace your entire index.html with this code:
-
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NoahCord — Next-Gen Messaging Platform</title>
+  <title>NoahCord — Premium Messaging Platform</title>
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    // Suppress Tailwind CDN production warning in console
     window.tailwind = window.tailwind || {};
     window.tailwind.config = {
       darkMode: 'class',
@@ -76,7 +55,7 @@ Replace your entire index.html with this code:
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <!-- React 18, ReactDOM, Babel, Supabase JS -->
+  <!-- React 18, ReactDOM, Babel, Supabase -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
@@ -213,7 +192,6 @@ Replace your entire index.html with this code:
         sparkles: <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z" />,
         crown: <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z" />,
         x: <g><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></g>,
-        user: <g><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></g>,
         logout: <g><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></g>,
         volume2: <g><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" /></g>,
         sidebar: <g><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="3" x2="9" y2="21" /></g>,
@@ -248,27 +226,37 @@ Replace your entire index.html with this code:
       }
     ];
 
+    const DEFAULT_ACCOUNTS = [
+      { id: 'usr-noah', username: 'Noah_', displayName: 'Noah_ (Fleet Admin)', password: 'admin123', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', role: 'admin', customStatus: '⚓ Fleet Captain' },
+      { id: 'usr-alex', username: 'alex_sailor', displayName: 'Alex Mercer', password: 'sailor123', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', role: 'member', customStatus: '⛵ Sailor' }
+    ];
+
     const DEFAULT_MESSAGES = {
       'chan-general': [
-        { id: 'm1', senderId: 'usr-noah', senderName: 'Noah_', senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', content: 'Welcome to **Sailors** ⚓! Send a message below to test real-time chat.', timestamp: '12:00 PM' }
+        { id: 'm1', senderId: 'usr-noah', senderName: 'Noah_', senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', content: 'Welcome to **Sailors** ⚓! Sign up or log in to test live chat.', timestamp: '12:00 PM' }
       ]
     };
 
     const AppContext = createContext(null);
 
     const AppProvider = ({ children }) => {
-      // 1. Session Persistence: Load active session from localStorage
+      // 1. Session Persistence
       const [currentUser, setCurrentUser] = useState(() => {
         const saved = localStorage.getItem('noahcord_active_session');
         return saved ? JSON.parse(saved) : null;
       });
 
-      const [accounts, setAccounts] = useState([]);
+      // 2. Registered Accounts Database
+      const [accounts, setAccounts] = useState(() => {
+        const saved = localStorage.getItem('noahcord_registered_accounts');
+        return saved ? JSON.parse(saved) : DEFAULT_ACCOUNTS;
+      });
+
       const [theme, setTheme] = useState(() => localStorage.getItem('noahcord_theme') || 'midnight');
       const [categories, setCategories] = useState(INITIAL_CATEGORIES);
       const [activeChannelId, setActiveChannelId] = useState('chan-general');
 
-      // 2. Message Persistence: Load messages from localStorage
+      // 3. Persistent Messages State
       const [messages, setMessages] = useState(() => {
         const saved = localStorage.getItem('noahcord_saved_messages');
         return saved ? JSON.parse(saved) : DEFAULT_MESSAGES;
@@ -281,7 +269,10 @@ Replace your entire index.html with this code:
       const [toastMsg, setToastMsg] = useState(null);
       const [activeVoiceCall, setActiveVoiceCall] = useState(null);
 
-      // Save user session to localStorage whenever currentUser changes
+      useEffect(() => {
+        localStorage.setItem('noahcord_registered_accounts', JSON.stringify(accounts));
+      }, [accounts]);
+
       useEffect(() => {
         if (currentUser) {
           localStorage.setItem('noahcord_active_session', JSON.stringify(currentUser));
@@ -290,105 +281,9 @@ Replace your entire index.html with this code:
         }
       }, [currentUser]);
 
-      // Save messages to localStorage whenever messages state changes
       useEffect(() => {
         localStorage.setItem('noahcord_saved_messages', JSON.stringify(messages));
       }, [messages]);
-
-      // Supabase Background Profile Sync & Auth State Listener
-      useEffect(() => {
-        if (!supabase) return;
-
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (session?.user) {
-            fetchUserProfile(session.user.id);
-          }
-        });
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-          if (session?.user) {
-            fetchUserProfile(session.user.id);
-          }
-        });
-
-        return () => subscription.unsubscribe();
-      }, []);
-
-      const fetchUserProfile = async (userId) => {
-        const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-        if (data) {
-          const userObj = {
-            id: data.id,
-            username: data.username,
-            displayName: data.display_name,
-            avatar: data.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-            banner: data.banner_url || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800',
-            bio: data.bio || 'Cruising NoahCord waters.',
-            pronouns: data.pronouns || 'they/them',
-            role: data.role || (data.username === 'Noah_' ? 'admin' : 'member'),
-            status: data.status || 'online',
-            customStatus: data.custom_status || (data.username === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor')
-          };
-          setCurrentUser(userObj);
-        }
-      };
-
-      // Realtime Database Sync with Supabase
-      useEffect(() => {
-        if (!currentUser || !supabase) return;
-
-        const loadMessagesAndProfiles = async () => {
-          const { data: profs } = await supabase.from('profiles').select('*');
-          if (profs && profs.length > 0) {
-            setAccounts(profs.map(p => ({
-              id: p.id,
-              username: p.username,
-              displayName: p.display_name,
-              avatar: p.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-              role: p.role,
-              customStatus: p.custom_status || '⛵ Sailor'
-            })));
-          }
-
-          const { data: msgs } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
-          if (msgs && msgs.length > 0) {
-            setMessages(prev => {
-              const updated = { ...prev };
-              msgs.forEach(m => {
-                const chanKey = m.channel_id || 'chan-general';
-                if (!updated[chanKey]) updated[chanKey] = [];
-                
-                // Avoid duplicating if already present
-                if (!updated[chanKey].some(existing => existing.id === m.id)) {
-                  const sender = profs?.find(p => p.id === m.sender_id);
-                  updated[chanKey].push({
-                    id: m.id,
-                    senderId: m.sender_id,
-                    senderName: sender ? sender.display_name : 'Sailor',
-                    senderAvatar: sender?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-                    content: m.content,
-                    timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    poll: m.poll_data
-                  });
-                }
-              });
-              return updated;
-            });
-          }
-        };
-
-        loadMessagesAndProfiles();
-
-        const channel = supabase.channel('public:messages')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-            loadMessagesAndProfiles();
-          })
-          .subscribe();
-
-        return () => {
-          supabase.removeChannel(channel);
-        };
-      }, [currentUser, activeChannelId]);
 
       useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
@@ -429,6 +324,9 @@ Replace your entire index.html with this code:
         const updated = { ...currentUser, ...updates };
         setCurrentUser(updated);
 
+        // Update accounts list
+        setAccounts(prev => prev.map(a => a.id === currentUser.id ? { ...a, ...updates } : a));
+
         if (supabase && currentUser.id) {
           await supabase.from('profiles').update({
             display_name: updates.displayName,
@@ -444,7 +342,6 @@ Replace your entire index.html with this code:
         triggerToast('Profile updated!');
       };
 
-      // Send Message function with persistent state + background DB sync
       const sendMessage = async (channelId, text, pollData = null) => {
         if (!currentUser) return;
 
@@ -464,7 +361,7 @@ Replace your entire index.html with this code:
           [channelId]: [...(prev[channelId] || []), newMsg]
         }));
 
-        // 2. Background sync to Supabase if connected
+        // 2. Background sync to Supabase
         if (supabase && currentUser.id) {
           const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(channelId);
           const payload = {
@@ -474,8 +371,7 @@ Replace your entire index.html with this code:
           };
           if (isUUID) payload.channel_id = channelId;
 
-          const { error } = await supabase.from('messages').insert(payload);
-          if (error) console.warn('Supabase DB Note:', error.message);
+          await supabase.from('messages').insert(payload);
         }
       };
 
@@ -494,7 +390,8 @@ Replace your entire index.html with this code:
 
       return (
         <AppContext.Provider value={{
-          accounts, currentUser, setCurrentUser, logout, updateProfile,
+          accounts, setAccounts,
+          currentUser, setCurrentUser, logout, updateProfile,
           theme, setTheme,
           categories, addChannel,
           activeChannelId, setActiveChannelId,
@@ -513,9 +410,9 @@ Replace your entire index.html with this code:
 
     const useApp = () => useContext(AppContext);
 
-    // --- Sign Up / Login Screen ---
+    // --- Strict Sign Up / Login Screen ---
     const AuthModal = () => {
-      const { setCurrentUser, triggerToast } = useApp();
+      const { accounts, setAccounts, setCurrentUser, triggerToast } = useApp();
       const [isSignUp, setIsSignUp] = useState(true);
       const [username, setUsername] = useState('');
       const [displayName, setDisplayName] = useState('');
@@ -529,89 +426,68 @@ Replace your entire index.html with this code:
         setLoading(true);
 
         const inputRaw = username.trim();
-        const isEmail = inputRaw.includes('@');
-        const cleanUser = isEmail ? inputRaw.split('@')[0] : inputRaw;
-        const email = isEmail ? inputRaw : `${cleanUser.toLowerCase().replace(/[^a-z0-9_]/g, '')}@noahcord.com`;
+        const cleanUser = inputRaw.includes('@') ? inputRaw.split('@')[0] : inputRaw;
+        const email = inputRaw.includes('@') ? inputRaw : `${cleanUser.toLowerCase().replace(/[^a-z0-9_]/g, '')}@noahcord.com`;
 
         try {
-          let loggedInUser = null;
-
           if (isSignUp) {
+            // --- SIGN UP ---
             if (cleanUser.length < 3) throw new Error('Username must be at least 3 characters.');
             if (password.length < 4) throw new Error('Password must be at least 4 characters.');
 
+            // Check if username already exists
+            const existingAcc = accounts.find(a => a.username.toLowerCase() === cleanUser.toLowerCase());
+            if (existingAcc) {
+              throw new Error(`Username @${cleanUser} is already registered! Please switch to Log In.`);
+            }
+
+            let newProfile = {
+              id: 'usr-' + Date.now(),
+              username: cleanUser,
+              displayName: displayName.trim() || cleanUser,
+              password: password,
+              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+              role: cleanUser === 'Noah_' ? 'admin' : 'member',
+              customStatus: cleanUser === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor'
+            };
+
             if (supabase) {
-              const { data, error } = await supabase.auth.signUp({
+              const { data } = await supabase.auth.signUp({
                 email: email,
                 password: password,
-                options: {
-                  data: {
-                    username: cleanUser,
-                    display_name: displayName.trim() || cleanUser
-                  }
-                }
+                options: { data: { username: cleanUser, display_name: displayName.trim() || cleanUser } }
               });
-
-              if (!error && data?.user) {
-                loggedInUser = {
-                  id: data.user.id,
-                  username: cleanUser,
-                  displayName: displayName.trim() || cleanUser,
-                  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-                  role: cleanUser === 'Noah_' ? 'admin' : 'member',
-                  customStatus: cleanUser === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor'
-                };
+              if (data?.user) {
+                newProfile.id = data.user.id;
               }
             }
 
-            if (!loggedInUser) {
-              loggedInUser = {
-                id: 'usr-' + Date.now(),
-                username: cleanUser,
-                displayName: displayName.trim() || cleanUser,
-                avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-                role: cleanUser === 'Noah_' ? 'admin' : 'member',
-                customStatus: cleanUser === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor'
-              };
-            }
+            // Save new account into accounts list
+            setAccounts(prev => [...prev, newProfile]);
+            setCurrentUser(newProfile);
+            triggerToast(`Account created! Welcome @${cleanUser}!`);
 
-            setCurrentUser(loggedInUser);
-            triggerToast(`Welcome to Sailors ⚓, @${cleanUser}!`);
           } else {
+            // --- STRICT LOG IN ---
+            const matchedAccount = accounts.find(a => a.username.toLowerCase() === cleanUser.toLowerCase());
+
+            if (!matchedAccount) {
+              throw new Error(`Account @${cleanUser} does not exist. Please Sign Up first!`);
+            }
+
+            if (matchedAccount.password && matchedAccount.password !== password) {
+              throw new Error(`Incorrect password for @${cleanUser}!`);
+            }
+
             if (supabase) {
-              const { data, error } = await supabase.auth.signInWithPassword({
-                email: email,
-                password: password
-              });
-
-              if (!error && data?.user) {
-                loggedInUser = {
-                  id: data.user.id,
-                  username: cleanUser,
-                  displayName: displayName.trim() || cleanUser,
-                  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-                  role: cleanUser === 'Noah_' ? 'admin' : 'member',
-                  customStatus: cleanUser === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor'
-                };
-              }
+              await supabase.auth.signInWithPassword({ email: email, password: password });
             }
 
-            if (!loggedInUser) {
-              loggedInUser = {
-                id: 'usr-' + Date.now(),
-                username: cleanUser,
-                displayName: displayName.trim() || cleanUser,
-                avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-                role: cleanUser === 'Noah_' ? 'admin' : 'member',
-                customStatus: cleanUser === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor'
-              };
-            }
-
-            setCurrentUser(loggedInUser);
-            triggerToast(`Welcome back, @${cleanUser}!`);
+            setCurrentUser(matchedAccount);
+            triggerToast(`Welcome back, @${matchedAccount.username}!`);
           }
         } catch (err) {
-          setErrorMsg(err.message || 'Authentication failed');
+          setErrorMsg(err.message || 'Authentication error');
         } finally {
           setLoading(false);
         }
@@ -1032,7 +908,7 @@ Replace your entire index.html with this code:
       );
     };
 
-    // --- Complete User Profile Settings Modal ---
+    // --- User Profile Modal ---
     const ProfileModal = () => {
       const { isProfileModalOpen, setIsProfileModalOpen, currentUser, updateProfile, theme, setTheme } = useApp();
       
@@ -1189,7 +1065,7 @@ Replace your entire index.html with this code:
       );
     };
 
-    // --- Main App ---
+    // --- Main App Root ---
     const MainApp = () => {
       const { currentUser, toastMsg } = useApp();
 
