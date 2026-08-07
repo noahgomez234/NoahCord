@@ -146,7 +146,7 @@
       if (errDiv) {
         errDiv.style.display = 'block';
         errDiv.innerHTML = '<div style="padding:20px; background:#090d16; color:#f87171; font-family:monospace; z-index:9999; position:fixed; inset:0;">' +
-          '<h2>NoahCord Application Error</h2>' +
+          '<h2>NoahCord Exception</h2>' +
           '<p>' + msg + '</p>' +
           '<p>Line: ' + line + ' | Col: ' + col + '</p>' +
           '<button onclick="location.reload()" style="background:#0ea5e9;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;margin-top:12px;">Reload Application</button>' +
@@ -171,12 +171,12 @@
   <script type="text/babel">
     const { useState, useEffect, useRef, createContext, useContext } = React;
 
-    // --- Live Supabase Client Setup ---
+    // --- Supabase Config ---
     const SUPABASE_URL = "https://hcmglicybaitjqwkqice.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbWdsaWN5YmFpdGpxd2txaWNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMTAzMzAsImV4cCI6MjEwMTY4NjMzMH0.oIovdQqvUEKiAAfhkT9-sRCYNyjmcWCM-jglidYVA-4";
     const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
-    // --- Icon Helper Component ---
+    // --- Icon Helper ---
     const Icon = ({ name, size = 18, className = "" }) => {
       const icons = {
         hash: <path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18" />,
@@ -191,9 +191,7 @@
         sparkles: <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z" />,
         crown: <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z" />,
         x: <g><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></g>,
-        user: <g><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></g>,
         logout: <g><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></g>,
-        pin: <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />,
         volume2: <g><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" /></g>,
         sidebar: <g><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="3" x2="9" y2="21" /></g>,
         chevronDown: <polyline points="6 9 12 15 18 9" />,
@@ -227,16 +225,21 @@
       }
     ];
 
+    const INITIAL_MESSAGES = {
+      'chan-general': [
+        { id: 'm1', senderId: 'usr-noah', senderName: 'Noah_', senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', content: 'Welcome to **Sailors** ⚓! Type your message below to test live chat.', timestamp: '12:00 PM' }
+      ]
+    };
+
     const AppContext = createContext(null);
 
     const AppProvider = ({ children }) => {
-      // Starts strictly unauthenticated (null)
       const [currentUser, setCurrentUser] = useState(null);
       const [accounts, setAccounts] = useState([]);
       const [theme, setTheme] = useState(() => localStorage.getItem('noahcord_theme') || 'midnight');
       const [categories, setCategories] = useState(INITIAL_CATEGORIES);
       const [activeChannelId, setActiveChannelId] = useState('chan-general');
-      const [messages, setMessages] = useState({});
+      const [messages, setMessages] = useState(INITIAL_MESSAGES);
       const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
       const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
       const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
@@ -244,7 +247,6 @@
       const [toastMsg, setToastMsg] = useState(null);
       const [activeVoiceCall, setActiveVoiceCall] = useState(null);
 
-      // Restore session if available
       useEffect(() => {
         if (!supabase) return;
         
@@ -283,56 +285,6 @@
         }
       };
 
-      // Load Messages & Sync Realtime with Supabase
-      useEffect(() => {
-        if (!currentUser || !supabase) return;
-
-        const loadMessagesAndProfiles = async () => {
-          const { data: profs } = await supabase.from('profiles').select('*');
-          if (profs) {
-            setAccounts(profs.map(p => ({
-              id: p.id,
-              username: p.username,
-              displayName: p.display_name,
-              avatar: p.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-              role: p.role,
-              customStatus: p.custom_status || '⛵ Sailor'
-            })));
-          }
-
-          const { data: msgs } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
-          if (msgs) {
-            const grouped = {};
-            msgs.forEach(m => {
-              if (!grouped[m.channel_id]) grouped[m.channel_id] = [];
-              const sender = profs?.find(p => p.id === m.sender_id);
-              grouped[m.channel_id].push({
-                id: m.id,
-                senderId: m.sender_id,
-                senderName: sender ? sender.display_name : 'Sailor',
-                senderAvatar: sender?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-                content: m.content,
-                timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                poll: m.poll_data
-              });
-            });
-            setMessages(grouped);
-          }
-        };
-
-        loadMessagesAndProfiles();
-
-        const channel = supabase.channel('public:messages')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-            loadMessagesAndProfiles();
-          })
-          .subscribe();
-
-        return () => {
-          supabase.removeChannel(channel);
-        };
-      }, [currentUser, activeChannelId]);
-
       useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('noahcord_theme', theme);
@@ -343,7 +295,6 @@
         setTimeout(() => setToastMsg(null), 3500);
       };
 
-      // 10-Click Secret Admin Panel
       const handleLogoClick = () => {
         if (!currentUser) return;
         const newCount = logoClickCount + 1;
@@ -387,28 +338,38 @@
         triggerToast('Profile updated!');
       };
 
+      // Send message with instant optimistic update
       const sendMessage = async (channelId, text, pollData = null) => {
         if (!currentUser) return;
 
-        if (supabase) {
-          await supabase.from('messages').insert({
-            channel_id: channelId,
+        const newMsg = {
+          id: 'msg-' + Date.now(),
+          senderId: currentUser.id,
+          senderName: currentUser.displayName,
+          senderAvatar: currentUser.avatar,
+          content: text,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          poll: pollData
+        };
+
+        // 1. INSTANT OPTIMISTIC RENDER
+        setMessages(prev => ({
+          ...prev,
+          [channelId]: [...(prev[channelId] || []), newMsg]
+        }));
+
+        // 2. Background sync with Supabase
+        if (supabase && currentUser.id) {
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(channelId);
+          const payload = {
             sender_id: currentUser.id,
             content: text,
             poll_data: pollData
-          });
-        } else {
-          // Local memory fallback
-          const newMsg = {
-            id: 'msg-' + Date.now(),
-            senderId: currentUser.id,
-            senderName: currentUser.displayName,
-            senderAvatar: currentUser.avatar,
-            content: text,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            poll: pollData
           };
-          setMessages(prev => ({ ...prev, [channelId]: [...(prev[channelId] || []), newMsg] }));
+          if (isUUID) payload.channel_id = channelId;
+
+          const { error } = await supabase.from('messages').insert(payload);
+          if (error) console.warn('Supabase DB Note:', error.message);
         }
       };
 
@@ -446,7 +407,7 @@
 
     const useApp = () => useContext(AppContext);
 
-    // --- Sign Up / Login Screen with Smart Fallback ---
+    // --- Sign Up / Login Screen ---
     const AuthModal = () => {
       const { setCurrentUser, triggerToast } = useApp();
       const [isSignUp, setIsSignUp] = useState(true);
@@ -485,10 +446,7 @@
                 }
               });
 
-              if (error) {
-                // Handle case where email signups are disabled in Supabase
-                console.warn('Supabase Auth Notice:', error.message);
-              } else if (data?.user) {
+              if (!error && data?.user) {
                 loggedInUser = {
                   id: data.user.id,
                   username: cleanUser,
@@ -514,7 +472,6 @@
             setCurrentUser(loggedInUser);
             triggerToast(`Welcome to Sailors ⚓, @${cleanUser}!`);
           } else {
-            // Log In
             if (supabase) {
               const { data, error } = await supabase.auth.signInWithPassword({
                 email: email,
@@ -765,7 +722,7 @@
             </div>
           )}
 
-          {/* Profile Banner */}
+          {/* User Bottom Card */}
           {currentUser && (
             <div className="p-3 bg-[#0f172a] border-t border-white/10 flex items-center justify-between">
               <div 
@@ -833,6 +790,7 @@
 
       return (
         <div className="flex-1 flex flex-col h-full bg-[#080b12] relative overflow-hidden">
+          {/* Header */}
           <div className="h-16 border-b border-white/10 px-6 flex items-center justify-between bg-[#0f172a]/40 backdrop-blur-md">
             <div className="flex items-center gap-2">
               <Icon name={activeChan?.type === 'voice' ? 'volume2' : 'hash'} className="text-sky-400" size={22} />
@@ -847,7 +805,7 @@
             </button>
           </div>
 
-          {/* Message List: Continuous messages have tight 2px spacing */}
+          {/* Messages Stream: Grouped consecutive messages have ultra-tight 2px spacing */}
           <div className="flex-1 overflow-y-auto p-6">
             {chanMessages.map((msg, idx) => {
               const prevMsg = chanMessages[idx - 1];
@@ -897,7 +855,7 @@
             <div ref={chatEndRef} />
           </div>
 
-          {/* GIPHY Search Drawer */}
+          {/* GIPHY Drawer */}
           {showGiphy && (
             <div className="absolute bottom-20 right-6 bg-[#0f172a] border border-white/10 p-3 rounded-2xl shadow-2xl z-30 w-72 space-y-2 glass-panel">
               <div className="text-xs font-bold text-gray-400 uppercase">GIPHY Search</div>
@@ -913,7 +871,7 @@
             </div>
           )}
 
-          {/* Chat Input Dock */}
+          {/* Input Dock */}
           <div className="p-4 bg-[#0f172a]/40 backdrop-blur-md border-t border-white/10">
             <form onSubmit={handleSend} className="flex items-center bg-[#0f172a] border border-white/10 rounded-2xl p-2 focus-within:border-sky-500 transition shadow-inner">
               <input
