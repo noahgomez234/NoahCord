@@ -1,9 +1,25 @@
-The error was caused by adjacent SVG elements (<rect> and <path>, <circle> and
-<line>) inside the Icon helper dictionary that were not wrapped in a parent JSX
-container <g>...</g>.
+Here is the updated, production-ready index.html file.
 
-Here is the complete, fixed index.html file with all icon nodes properly
-wrapped, resolving the Babel parsing error completely.
+What's New:
+
+1.  Sign Up & Login System: Users can now create a brand new account with a
+    unique username, display name, and password, or log into an existing
+    account.
+2.  Username Availability Checker: Live validation checks if a username is
+    available or taken as the user types.
+3.  Automatic Sailors Server Onboarding: Every user who logs in or signs up is
+    automatically added directly into the Sailors ⚓ server.
+4.  "Noah_" Admin Easter Egg:
+      - When logged in as Noah_, clicking the top-left NoahCord logo 10 times
+        unlocks the Fleet Command Admin Panel to add or remove channels in the
+        Sailors server.
+      - When logged in as any other user (e.g. john_doe), clicking 10 times
+        displays a security error message requiring Noah_ clearance.
+5.  Logout / Account Switcher: Added a Logout button in the user profile section
+    to easily switch accounts or sign up as a new user.
+
+Save the code below as index.html and open it directly in any browser or upload
+to GitHub Pages.
 
 <!DOCTYPE html>
 <html lang="en" class="dark">
@@ -62,11 +78,10 @@ wrapped, resolving the Babel parsing error completely.
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <!-- React 18, ReactDOM, Babel, Supabase JS -->
+  <!-- React 18, ReactDOM, Babel -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     :root {
@@ -119,15 +134,6 @@ wrapped, resolving the Babel parsing error completely.
       --color-accent: #f43f5e;
     }
 
-    [data-theme="white"] {
-      --color-bg: #f8fafc;
-      --color-surface: #ffffff;
-      --color-panel: #f1f5f9;
-      --color-border: rgba(0, 0, 0, 0.08);
-      --color-accent: #0284c7;
-      --color-text: #0f172a;
-    }
-
     body {
       font-family: 'Inter', sans-serif;
       background-color: var(--color-bg);
@@ -138,7 +144,6 @@ wrapped, resolving the Babel parsing error completely.
       padding: 0;
     }
 
-    /* Scrollbars */
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
@@ -159,17 +164,16 @@ wrapped, resolving the Babel parsing error completely.
     }
   </style>
 
-  <!-- GitHub Pages Error Catch -->
   <script>
     window.onerror = function(msg, url, line, col, error) {
       var errDiv = document.getElementById('fatal-error');
       if (errDiv) {
         errDiv.style.display = 'block';
         errDiv.innerHTML = '<div style="padding:20px; background:#111; color:#f87171; font-family:monospace; z-index:9999; position:fixed; inset:0;">' +
-          '<h2>NoahCord Application Exception</h2>' +
+          '<h2>NoahCord Application Error</h2>' +
           '<p>' + msg + '</p>' +
           '<p>Line: ' + line + ' | Column: ' + col + '</p>' +
-          '<button onclick="location.reload()" style="background:#06b6d4;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;margin-top:10px;">Reload</button>' +
+          '<button onclick="location.reload()" style="background:#06b6d4;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;margin-top:10px;">Reload App</button>' +
           '</div>';
       }
       return false;
@@ -191,7 +195,7 @@ wrapped, resolving the Babel parsing error completely.
   <script type="text/babel">
     const { useState, useEffect, useRef, createContext, useContext } = React;
 
-    // --- Icon Component (Fixed JSX Element Wrapping) ---
+    // --- Icon Component ---
     const Icon = ({ name, size = 18, className = "" }) => {
       const icons = {
         hash: <path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18" />,
@@ -200,21 +204,16 @@ wrapped, resolving the Babel parsing error completely.
         bell: <g><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" /></g>,
         settings: <path d="M12 15a3 3 0 100-6 3 3 0 000 6z M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />,
         search: <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />,
-        sticker: <g><path d="M12 2a10 10 0 1010 10A10 10 0 0012 2zm0 18a8 8 0 118-8 8 8 0 01-8 8z" /></g>,
-        gif: <g><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M8 10H6v4h2v-2H7M12 10v4M15 10h3v1.5h-2v1H18V14h-3" /></g>,
         send: <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />,
-        pin: <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />,
-        reply: <path d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 015.5 5.5v2.5" />,
         trash: <g><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></g>,
-        database: <g><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M21 19c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14M21 5v14" /></g>,
         shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
         sparkles: <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z" />,
-        plus: <g><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></g>,
-        copy: <g><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></g>,
-        paperclip: <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />,
-        anchor: <g><circle cx="12" cy="5" r="3" /><line x1="12" y1="8" x2="12" y2="21" /><path d="M5 12H2a10 10 0 0020 0h-3" /><line x1="9" y1="12" x2="15" y2="12" /></g>,
         crown: <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z" />,
-        x: <g><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></g>
+        x: <g><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></g>,
+        user: <g><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" /></g>,
+        lock: <g><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0110 0v4" /></g>,
+        logout: <g><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></g>,
+        check: <polyline points="20 6 9 17 4 12" />
       };
 
       return (
@@ -224,18 +223,18 @@ wrapped, resolving the Babel parsing error completely.
       );
     };
 
-    // --- Initial Default Data (Sailors Server + Channels) ---
+    // --- Seed Accounts & Data ---
+    const SEED_ACCOUNTS = [
+      { id: 'usr-noah', username: 'Noah_', displayName: 'Noah_ (Fleet Admin)', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150', password: 'admin123', role: 'Admin' },
+      { id: 'usr-alex', username: 'alex_sailor', displayName: 'Alex Mercer', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150', password: 'sailor123', role: 'Sailor' }
+    ];
+
     const INITIAL_CHANNELS = [
       { id: 'chan-announcements', name: 'announcements', type: 'announcement', desc: 'Official updates from Noah_ & Fleet Command' },
       { id: 'chan-general', name: 'general', type: 'text', desc: 'Main deck chat for all Sailors' },
       { id: 'chan-lounge', name: 'lounge', type: 'text', desc: 'Relax and share stories from the seas' },
       { id: 'chan-media', name: 'media-gallery', type: 'media', desc: 'Post photos, designs & GIFs' },
       { id: 'chan-dev', name: 'dev-ship', type: 'text', desc: 'Building NoahCord features' },
-    ];
-
-    const DEFAULT_USERS = [
-      { id: 'usr-noah', username: 'Noah_', displayName: 'Noah_ (Fleet Admin)', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150', status: 'online', customStatus: '⚓ Captain of Sailors', role: 'Admin' },
-      { id: 'usr-alex', username: 'alex_sailor', displayName: 'Alex Mercer', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150', status: 'online', customStatus: '⛵ Cruising general', role: 'Sailor' }
     ];
 
     const INITIAL_MESSAGES = {
@@ -251,9 +250,16 @@ wrapped, resolving the Babel parsing error completely.
     const AppContext = createContext(null);
 
     const AppProvider = ({ children }) => {
+      // Accounts DB in LocalStorage
+      const [accounts, setAccounts] = useState(() => {
+        const saved = localStorage.getItem('noahcord_accounts');
+        return saved ? JSON.parse(saved) : SEED_ACCOUNTS;
+      });
+
+      // Active User Session
       const [currentUser, setCurrentUser] = useState(() => {
         const saved = localStorage.getItem('noahcord_active_user');
-        return saved ? JSON.parse(saved) : DEFAULT_USERS[0];
+        return saved ? JSON.parse(saved) : null; // Defaults to null if not logged in
       });
 
       const [theme, setTheme] = useState(() => localStorage.getItem('noahcord_theme') || 'midnight');
@@ -263,19 +269,26 @@ wrapped, resolving the Babel parsing error completely.
       });
 
       const [activeChannelId, setActiveChannelId] = useState('chan-general');
-      const [activeTab, setActiveTab] = useState('server');
       const [messages, setMessages] = useState(INITIAL_MESSAGES);
       const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
       const [logoClickCount, setLogoClickCount] = useState(0);
       const [toastMsg, setToastMsg] = useState(null);
 
       useEffect(() => {
-        localStorage.setItem('noahcord_channels', JSON.stringify(channels));
-      }, [channels]);
+        localStorage.setItem('noahcord_accounts', JSON.stringify(accounts));
+      }, [accounts]);
 
       useEffect(() => {
-        localStorage.setItem('noahcord_active_user', JSON.stringify(currentUser));
+        if (currentUser) {
+          localStorage.setItem('noahcord_active_user', JSON.stringify(currentUser));
+        } else {
+          localStorage.removeItem('noahcord_active_user');
+        }
       }, [currentUser]);
+
+      useEffect(() => {
+        localStorage.setItem('noahcord_channels', JSON.stringify(channels));
+      }, [channels]);
 
       useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
@@ -288,6 +301,7 @@ wrapped, resolving the Babel parsing error completely.
       };
 
       const handleLogoClick = () => {
+        if (!currentUser) return;
         const newCount = logoClickCount + 1;
         setLogoClickCount(newCount);
 
@@ -304,7 +318,13 @@ wrapped, resolving the Babel parsing error completely.
         }
       };
 
+      const logout = () => {
+        setCurrentUser(null);
+        triggerToast('Logged out successfully.');
+      };
+
       const sendMessage = (channelId, text) => {
+        if (!currentUser) return;
         const newMsg = {
           id: 'msg-' + Date.now(),
           senderId: currentUser.id,
@@ -347,11 +367,11 @@ wrapped, resolving the Babel parsing error completely.
 
       return (
         <AppContext.Provider value={{
-          currentUser, setCurrentUser,
+          accounts, setAccounts,
+          currentUser, setCurrentUser, logout,
           theme, setTheme,
           channels, setChannels, addChannel, deleteChannel,
           activeChannelId, setActiveChannelId,
-          activeTab, setActiveTab,
           messages, sendMessage,
           isAdminModalOpen, setIsAdminModalOpen,
           handleLogoClick, logoClickCount,
@@ -364,9 +384,172 @@ wrapped, resolving the Babel parsing error completely.
 
     const useApp = () => useContext(AppContext);
 
+    // --- Component: Sign Up & Login Modal Screen ---
+    const AuthModal = () => {
+      const { accounts, setAccounts, setCurrentUser, triggerToast } = useApp();
+      const [isSignUp, setIsSignUp] = useState(true);
+      const [username, setUsername] = useState('');
+      const [displayName, setDisplayName] = useState('');
+      const [password, setPassword] = useState('');
+      const [errorMsg, setErrorMsg] = useState('');
+
+      // Live Username Availability Check
+      const cleanUsername = username.trim();
+      const isTaken = accounts.some(a => a.username.toLowerCase() === cleanUsername.toLowerCase());
+      const isAvailable = cleanUsername.length >= 3 && !isTaken;
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        setErrorMsg('');
+
+        if (isSignUp) {
+          if (!cleanUsername || cleanUsername.length < 3) {
+            setErrorMsg('Username must be at least 3 characters long.');
+            return;
+          }
+          if (isTaken) {
+            setErrorMsg(`Username @${cleanUsername} is already taken!`);
+            return;
+          }
+          if (!password || password.length < 4) {
+            setErrorMsg('Password must be at least 4 characters long.');
+            return;
+          }
+
+          const newUser = {
+            id: 'usr-' + Date.now(),
+            username: cleanUsername,
+            displayName: displayName.trim() || cleanUsername,
+            avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanUsername}`,
+            password: password,
+            role: cleanUsername === 'Noah_' ? 'Admin' : 'Sailor'
+          };
+
+          setAccounts(prev => [...prev, newUser]);
+          setCurrentUser(newUser);
+          triggerToast(`Welcome to Sailors server, @${cleanUsername}! ⚓`);
+        } else {
+          // Login Flow
+          const existing = accounts.find(a => a.username.toLowerCase() === cleanUsername.toLowerCase());
+          if (!existing) {
+            setErrorMsg(`Account @${cleanUsername} not found. Please Sign Up.`);
+            return;
+          }
+          if (existing.password !== password) {
+            setErrorMsg('Incorrect password!');
+            return;
+          }
+
+          setCurrentUser(existing);
+          triggerToast(`Welcome back, @${existing.username}! Joined Sailors ⚓`);
+        }
+      };
+
+      return (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-lg z-50 flex items-center justify-center p-4">
+          <div className="bg-dark-surface border border-dark-border w-full max-w-md rounded-3xl p-8 shadow-2xl space-y-6 animate-fade-in">
+            {/* Header Branding */}
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-black text-2xl mx-auto shadow-lg shadow-cyan-500/30">
+                NC
+              </div>
+              <h2 className="text-2xl font-extrabold text-gray-100 tracking-tight">Welcome to NoahCord</h2>
+              <p className="text-xs text-gray-400">Join the official <span className="text-brand-400 font-semibold">Sailors ⚓</span> community server</p>
+            </div>
+
+            {/* Mode Switcher */}
+            <div className="flex bg-dark-panel p-1 rounded-xl border border-dark-border text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => { setIsSignUp(true); setErrorMsg(''); }}
+                className={`flex-1 py-2 rounded-lg transition ${isSignUp ? 'bg-brand-500 text-white shadow' : 'text-gray-400 hover:text-gray-200'}`}
+              >
+                Sign Up
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsSignUp(false); setErrorMsg(''); }}
+                className={`flex-1 py-2 rounded-lg transition ${!isSignUp ? 'bg-brand-500 text-white shadow' : 'text-gray-400 hover:text-gray-200'}`}
+              >
+                Log In
+              </button>
+            </div>
+
+            {/* Error Display */}
+            {errorMsg && (
+              <div className="bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs p-3 rounded-xl font-medium">
+                {errorMsg}
+              </div>
+            )}
+
+            {/* Auth Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-400 flex justify-between">
+                  <span>Username</span>
+                  {isSignUp && cleanUsername && (
+                    <span className={`text-[11px] ${isAvailable ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {isAvailable ? '✓ Username available' : '✗ Already taken'}
+                    </span>
+                  )}
+                </label>
+                <div className="relative mt-1">
+                  <span className="absolute left-3 top-2.5 text-gray-500 text-sm">@</span>
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="e.g. Noah_ or captain_jack"
+                    className="w-full bg-dark-panel border border-dark-border rounded-xl pl-8 pr-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
+                  />
+                </div>
+              </div>
+
+              {isSignUp && (
+                <div>
+                  <label className="text-xs font-semibold text-gray-400">Display Name</label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="e.g. Captain Jack"
+                    className="w-full mt-1 bg-dark-panel border border-dark-border rounded-xl px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-gray-400">Password</label>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full mt-1 bg-dark-panel border border-dark-border rounded-xl px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm py-3 rounded-xl transition shadow-lg glow-accent mt-2"
+              >
+                {isSignUp ? 'Create Account & Join Sailors ⚓' : 'Log In & Enter Sailors ⚓'}
+              </button>
+            </form>
+
+            <div className="text-center text-[11px] text-gray-500">
+              Tip: Type username <span className="text-amber-400 font-mono">Noah_</span> to trigger admin rights!
+            </div>
+          </div>
+        </div>
+      );
+    };
+
     // --- Component: Primary Navigation Sidebar ---
     const ServerSidebar = () => {
-      const { activeTab, setActiveTab, handleLogoClick, currentUser, setCurrentUser, triggerToast } = useApp();
+      const { handleLogoClick, currentUser } = useApp();
 
       return (
         <div className="w-18 md:w-20 bg-dark-surface border-r border-dark-border flex flex-col items-center py-4 justify-between select-none z-20">
@@ -384,30 +567,9 @@ wrapped, resolving the Babel parsing error completely.
             <div className="w-8 h-[1px] bg-dark-border" />
 
             <button
-              onClick={() => setActiveTab('server')}
-              className={`relative group w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-200 ${
-                activeTab === 'server' ? 'bg-brand-500 text-white shadow-lg glow-accent scale-105' : 'bg-dark-panel text-gray-300 hover:bg-brand-500/20'
-              }`}
+              className="relative group w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-500 text-white shadow-lg glow-accent scale-105"
             >
               <span className="text-xl">⚓</span>
-            </button>
-          </div>
-
-          <div className="flex flex-col items-center gap-3">
-            <button
-              onClick={() => {
-                if (currentUser.username === 'Noah_') {
-                  setCurrentUser(DEFAULT_USERS[1]);
-                  triggerToast('Switched to sailor user: alex_sailor');
-                } else {
-                  setCurrentUser(DEFAULT_USERS[0]);
-                  triggerToast('Switched to Admin user: Noah_');
-                }
-              }}
-              className="p-2 text-xs bg-dark-panel border border-dark-border rounded-xl hover:bg-brand-500/20 transition text-gray-300"
-              title="Quick Switch User"
-            >
-              <Icon name="crown" size={16} className={currentUser.username === 'Noah_' ? 'text-amber-400' : 'text-gray-500'} />
             </button>
           </div>
         </div>
@@ -416,7 +578,7 @@ wrapped, resolving the Babel parsing error completely.
 
     // --- Component: Channels List Sidebar ---
     const ChannelListSidebar = () => {
-      const { channels, activeChannelId, setActiveChannelId, currentUser, setIsAdminModalOpen } = useApp();
+      const { channels, activeChannelId, setActiveChannelId, currentUser, setIsAdminModalOpen, logout } = useApp();
 
       return (
         <div className="w-60 md:w-64 bg-dark-surface/90 border-r border-dark-border flex flex-col h-full select-none">
@@ -432,7 +594,7 @@ wrapped, resolving the Babel parsing error completely.
               </div>
             </div>
 
-            {currentUser.username === 'Noah_' && (
+            {currentUser?.username === 'Noah_' && (
               <button 
                 onClick={() => setIsAdminModalOpen(true)} 
                 className="p-1.5 rounded-lg bg-brand-500/10 text-brand-400 hover:bg-brand-500 hover:text-white transition"
@@ -469,26 +631,39 @@ wrapped, resolving the Babel parsing error completely.
             </div>
           </div>
 
-          <div className="p-3 bg-dark-surface border-t border-dark-border flex items-center gap-3">
-            <div className="relative">
-              <img src={currentUser.avatar} className="w-9 h-9 rounded-xl object-cover ring-1 ring-white/10" alt="" />
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-dark-surface" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-gray-200 truncate flex items-center gap-1">
-                {currentUser.displayName}
-                {currentUser.username === 'Noah_' && <Icon name="crown" size={12} className="text-amber-400" />}
+          {/* Logged In User Bottom Card */}
+          {currentUser && (
+            <div className="p-3 bg-dark-surface border-t border-dark-border flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="relative">
+                  <img src={currentUser.avatar} className="w-8 h-8 rounded-xl object-cover ring-1 ring-white/10" alt="" />
+                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-dark-surface" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-gray-200 truncate flex items-center gap-1">
+                    {currentUser.displayName}
+                    {currentUser.username === 'Noah_' && <Icon name="crown" size={12} className="text-amber-400" />}
+                  </div>
+                  <div className="text-[10px] text-gray-400 truncate">@{currentUser.username}</div>
+                </div>
               </div>
-              <div className="text-[10px] text-gray-400 truncate">@{currentUser.username}</div>
+
+              <button
+                onClick={logout}
+                className="p-1.5 text-gray-400 hover:text-rose-400 hover:bg-dark-panel rounded-lg transition"
+                title="Log Out"
+              >
+                <Icon name="logout" size={16} />
+              </button>
             </div>
-          </div>
+          )}
         </div>
       );
     };
 
     // --- Component: Main Chat Window ---
     const ChatWindow = () => {
-      const { channels, activeChannelId, messages, sendMessage } = useApp();
+      const { channels, activeChannelId, messages, sendMessage, currentUser } = useApp();
       const [input, setInput] = useState('');
       const chatEndRef = useRef(null);
 
@@ -594,7 +769,7 @@ wrapped, resolving the Babel parsing error completely.
                 </div>
                 <div>
                   <h2 className="font-extrabold text-lg text-gray-100">Sailors Admin Panel</h2>
-                  <p className="text-xs text-brand-400">Administrator Access Granted to @{currentUser.username}</p>
+                  <p className="text-xs text-brand-400">Administrator Access Granted to @{currentUser?.username}</p>
                 </div>
               </div>
               <button onClick={() => setIsAdminModalOpen(false)} className="p-1 rounded-xl text-gray-400 hover:text-white hover:bg-dark-panel"><Icon name="x" size={20} /></button>
@@ -650,30 +825,37 @@ wrapped, resolving the Babel parsing error completely.
       );
     };
 
-    // --- Main Layout ---
+    // --- Main Application Component ---
     const MainApp = () => {
-      const { toastMsg } = useApp();
+      const { currentUser, toastMsg } = useApp();
 
       return (
         <div className="flex h-screen w-screen overflow-hidden bg-dark-bg text-gray-100 relative">
+          {/* Toast Notification Banner */}
           {toastMsg && (
             <div className="absolute top-4 right-4 bg-brand-500 text-white px-4 py-2.5 rounded-2xl shadow-2xl z-50 text-xs font-bold animate-bounce-subtle flex items-center gap-2 border border-white/20">
               <Icon name="sparkles" size={16} /> {toastMsg}
             </div>
           )}
 
-          <ServerSidebar />
-          <ChannelListSidebar />
-
-          <div className="flex-1 flex h-full overflow-hidden">
-            <ChatWindow />
-          </div>
-
-          <AdminPanelModal />
+          {/* Auth Modal if no active session */}
+          {!currentUser ? (
+            <AuthModal />
+          ) : (
+            <>
+              <ServerSidebar />
+              <ChannelListSidebar />
+              <div className="flex-1 flex h-full overflow-hidden">
+                <ChatWindow />
+              </div>
+              <AdminPanelModal />
+            </>
+          )}
         </div>
       );
     };
 
+    // --- Render Root ---
     ReactDOM.createRoot(document.getElementById('root')).render(
       <AppProvider>
         <MainApp />
