@@ -1,3 +1,157 @@
+Here is the complete, production-ready solution that removes all fake/mock IDs,
+eliminates local user fallbacks, and strictly uses real Supabase Auth UUIDs
+(auth.users.id) across all tables and operations.
+
+Step 1: Run this SQL Migration in your Supabase SQL Editor (10 Seconds)
+
+1.  Open your Supabase Dashboard.
+2.  Go to SQL Editor \rightarrow New Query.
+3.  Paste and run this script. It sets up proper foreign keys referencing
+    auth.users.id, RLS policies, and an automatic trigger that builds user
+    profiles upon signup:
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 1. PROFILES TABLE (Strictly References auth.users.id)
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  username TEXT UNIQUE NOT NULL,
+  display_name TEXT NOT NULL,
+  avatar_url TEXT,
+  banner_url TEXT,
+  bio TEXT DEFAULT '',
+  pronouns TEXT DEFAULT '',
+  role TEXT DEFAULT 'member' CHECK (role IN ('member', 'admin')),
+  accent_color TEXT DEFAULT '#0ea5e9',
+  theme_preference TEXT DEFAULT 'midnight',
+  status TEXT DEFAULT 'online' CHECK (status IN ('online', 'idle', 'dnd', 'offline')),
+  custom_status TEXT DEFAULT '',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 2. SERVERS & CHANNELS
+CREATE TABLE IF NOT EXISTS public.servers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  owner_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.channels (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  server_id UUID NOT NULL REFERENCES public.servers(id) ON DELETE CASCADE,
+  category_name TEXT DEFAULT 'Deck Operations',
+  name TEXT NOT NULL,
+  type TEXT DEFAULT 'text' CHECK (type IN ('text', 'voice', 'announcement')),
+  topic TEXT DEFAULT '',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 3. MESSAGES TABLE (sender_id strictly references public.profiles.id -> auth.users.id)
+CREATE TABLE IF NOT EXISTS public.messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  channel_id TEXT NOT NULL,
+  sender_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  content TEXT DEFAULT '',
+  attachment_url TEXT,
+  poll_data JSONB,
+  is_pinned BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 4. ROW LEVEL SECURITY (RLS) POLICIES
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.servers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.channels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public Profiles Viewable" ON public.profiles;
+DROP POLICY IF EXISTS "Users Update Own Profile" ON public.profiles;
+DROP POLICY IF EXISTS "Public Profiles Insertable" ON public.profiles;
+DROP POLICY IF EXISTS "Messages Viewable" ON public.messages;
+DROP POLICY IF EXISTS "Users Insert Messages" ON public.messages;
+DROP POLICY IF EXISTS "Noah Admin Server Control" ON public.servers;
+DROP POLICY IF EXISTS "Noah Admin Channel Control" ON public.channels;
+
+CREATE POLICY "Public Profiles Viewable" ON public.profiles FOR SELECT USING (true);
+CREATE POLICY "Users Update Own Profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Public Profiles Insertable" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Messages Viewable" ON public.messages FOR SELECT USING (true);
+CREATE POLICY "Users Insert Messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+
+-- Admin Clearance Function for Noah_
+CREATE OR REPLACE FUNCTION public.is_noah_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND (username = 'Noah_' OR role = 'admin')
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE POLICY "Noah Admin Server Control" ON public.servers FOR ALL USING (public.is_noah_admin());
+CREATE POLICY "Noah Admin Channel Control" ON public.channels FOR ALL USING (public.is_noah_admin());
+
+-- Trigger: Automatically build profile row when a user signs up in auth.users
+CREATE OR REPLACE FUNCTION public.handle_new_user_profile()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, username, display_name, role, avatar_url)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'username', 'sailor_' || SUBSTRING(NEW.id::text, 1, 6)),
+    COALESCE(NEW.raw_user_meta_data->>'display_name', 'Sailor'),
+    CASE WHEN COALESCE(NEW.raw_user_meta_data->>'username', '') = 'Noah_' THEN 'admin' ELSE 'member' END,
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200'
+  )
+  ON CONFLICT (id) DO UPDATE
+  SET 
+    username = EXCLUDED.username,
+    display_name = EXCLUDED.display_name,
+    role = CASE WHEN EXCLUDED.username = 'Noah_' THEN 'admin' ELSE profiles.role END;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_profile();
+
+-- Storage Buckets
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('avatars', 'avatars', true), ('attachments', 'attachments', true) 
+ON CONFLICT (id) DO NOTHING;
+
+-- Realtime Publications
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+Step 2: Replace your index.html with this code
+
+What Was Changed in the Code:
+
+  - Zero Mock Data: All hardcoded user IDs (usr-noah, usr-alex, fake fallback
+    strings) have been completely purged.
+  - Strict Supabase Auth UUIDs: await supabase.auth.getUser() is called for
+    authentication and messaging operations, using user.id as the primary key
+    and foreign key everywhere.
+  - Pure Supabase Data Stream: Profiles, user lists, and messages are fetched
+    directly from the database and updated in real time via Supabase WebSockets
+    across all devices.
 
 <!DOCTYPE html>
 <html lang="en" class="dark">
@@ -174,16 +328,7 @@
   <script type="text/babel">
     const { useState, useEffect, useRef, createContext, useContext } = React;
 
-    // --- Helper function for RFC4122 Compliant UUID Generation ---
-    function generateUUID() {
-      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-    }
-
-    // --- Live Supabase Client Setup ---
+    // --- Live Supabase Setup ---
     const SUPABASE_URL = "https://hcmglicybaitjqwkqice.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbWdsaWN5YmFpdGpxd2txaWNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMTAzMzAsImV4cCI6MjEwMTY4NjMzMH0.oIovdQqvUEKiAAfhkT9-sRCYNyjmcWCM-jglidYVA-4";
     const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -238,30 +383,16 @@
       }
     ];
 
-    const DEFAULT_ACCOUNTS = [
-      { id: '343e0618-0000-4000-a000-000000000001', username: 'Noah_', displayName: 'Noah_ (Fleet Admin)', password: 'admin123', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', role: 'admin', customStatus: '⚓ Fleet Captain' },
-      { id: '343e0618-0000-4000-a000-000000000002', username: 'alex_sailor', displayName: 'Alex Mercer', password: 'sailor123', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', role: 'member', customStatus: '⛵ Sailor' }
-    ];
-
     const AppContext = createContext(null);
 
     const AppProvider = ({ children }) => {
-      // Session Persistence
-      const [currentUser, setCurrentUser] = useState(() => {
-        const saved = localStorage.getItem('noahcord_active_session');
-        return saved ? JSON.parse(saved) : null;
-      });
-
-      const [accounts, setAccounts] = useState(() => {
-        const saved = localStorage.getItem('noahcord_registered_accounts');
-        return saved ? JSON.parse(saved) : DEFAULT_ACCOUNTS;
-      });
-
+      const [currentUser, setCurrentUser] = useState(null);
+      const [accounts, setAccounts] = useState([]);
       const [theme, setTheme] = useState(() => localStorage.getItem('noahcord_theme') || 'midnight');
       const [categories, setCategories] = useState(INITIAL_CATEGORIES);
       const [activeChannelId, setActiveChannelId] = useState('chan-general');
 
-      // Messages State: NO LOCALSTORAGE MESSAGES — Supabase is the single source of truth!
+      // Messages State: Pure Supabase Single Source of Truth
       const [messages, setMessages] = useState({});
 
       const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
@@ -273,49 +404,26 @@
       const [toastMsg, setToastMsg] = useState(null);
       const [activeVoiceCall, setActiveVoiceCall] = useState(null);
 
-      useEffect(() => {
-        localStorage.setItem('noahcord_registered_accounts', JSON.stringify(accounts));
-      }, [accounts]);
-
-      useEffect(() => {
-        if (currentUser) {
-          localStorage.setItem('noahcord_active_session', JSON.stringify(currentUser));
-          ensureSupabaseProfile(currentUser);
-        } else {
-          localStorage.removeItem('noahcord_active_session');
-        }
-      }, [currentUser]);
-
-      // Auto-upsert profile to Supabase DB so sender foreign key exists
-      const ensureSupabaseProfile = async (userObj) => {
-        if (!supabase || !userObj) return;
-        try {
-          await supabase.from('profiles').upsert({
-            id: userObj.id,
-            username: userObj.username,
-            display_name: userObj.displayName || userObj.username,
-            avatar_url: userObj.avatar,
-            custom_status: userObj.customStatus || '⛵ Sailor',
-            role: userObj.role || 'member'
-          });
-        } catch (e) {
-          console.warn("Profile sync notice:", e);
-        }
-      };
-
-      // Restore Supabase Auth Session
+      // Startup: Fetch Authenticated User using supabase.auth.getUser()
       useEffect(() => {
         if (!supabase) return;
 
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (session?.user) {
-            fetchUserProfile(session.user.id);
+        const initAuthUser = async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await fetchUserProfile(user.id);
+          } else {
+            setCurrentUser(null);
           }
-        });
+        };
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        initAuthUser();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
           if (session?.user) {
-            fetchUserProfile(session.user.id);
+            await fetchUserProfile(session.user.id);
+          } else {
+            setCurrentUser(null);
           }
         });
 
@@ -323,10 +431,11 @@
       }, []);
 
       const fetchUserProfile = async (userId) => {
+        if (!supabase) return;
         const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
         if (data) {
           const userObj = {
-            id: data.id,
+            id: data.id, // Real auth.users.id UUID
             username: data.username,
             displayName: data.display_name,
             avatar: data.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
@@ -341,11 +450,10 @@
         }
       };
 
-      // Load Messages Directly From Supabase for Channel
+      // Load Messages directly from Supabase for current channel
       const loadChannelMessages = async (chanId) => {
         if (!supabase) return;
 
-        // Fetch profiles for sender metadata
         const { data: profs } = await supabase.from('profiles').select('*');
         const profMap = {};
         if (profs) {
@@ -387,14 +495,12 @@
         }
       };
 
-      // Realtime Messages Subscription Across Devices
+      // Multi-Device Realtime Subscription
       useEffect(() => {
         if (!currentUser || !supabase) return;
 
-        // Fetch latest messages from Supabase single source of truth
         loadChannelMessages(activeChannelId);
 
-        // Realtime Subscription
         const channel = supabase.channel(`realtime:messages:${activeChannelId}`)
           .on(
             'postgres_changes',
@@ -407,7 +513,6 @@
             async (payload) => {
               const newMsg = payload.new;
 
-              // Fetch sender details
               let senderName = 'Sailor';
               let senderAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
 
@@ -435,12 +540,10 @@
               setMessages(prev => {
                 const currentList = prev[activeChannelId] || [];
 
-                // Deduplicate by ID
                 if (currentList.some(m => m.id === formattedMsg.id)) {
                   return prev;
                 }
 
-                // Merge / Replace optimistic message if match found
                 const optIndex = currentList.findIndex(
                   m => m.isOptimistic && m.senderId === formattedMsg.senderId && m.content === formattedMsg.content
                 );
@@ -462,7 +565,6 @@
           )
           .subscribe((status) => {
             if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-              // Auto-reconnect on connection drop
               setTimeout(() => loadChannelMessages(activeChannelId), 2000);
             }
           });
@@ -502,42 +604,45 @@
 
       const logout = async () => {
         if (supabase) await supabase.auth.signOut();
-        localStorage.removeItem('noahcord_active_session');
         setCurrentUser(null);
         setMobileMenuOpen(false);
         triggerToast('Logged out successfully.');
       };
 
       const updateProfile = async (updates) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
         const updated = { ...currentUser, ...updates };
         setCurrentUser(updated);
 
-        setAccounts(prev => prev.map(a => a.id === currentUser.id ? { ...a, ...updates } : a));
+        await supabase.from('profiles').update({
+          display_name: updates.displayName,
+          username: updates.username,
+          bio: updates.bio,
+          pronouns: updates.pronouns,
+          avatar_url: updates.avatar,
+          banner_url: updates.banner,
+          custom_status: updates.customStatus,
+          status: updates.status
+        }).eq('id', user.id);
 
-        if (supabase && currentUser.id) {
-          await supabase.from('profiles').update({
-            display_name: updates.displayName,
-            username: updates.username,
-            bio: updates.bio,
-            pronouns: updates.pronouns,
-            avatar_url: updates.avatar,
-            banner_url: updates.banner,
-            custom_status: updates.customStatus,
-            status: updates.status
-          }).eq('id', currentUser.id);
-        }
         triggerToast('Profile updated!');
       };
 
-      // Send Message function with Optimistic Rendering & Supabase Insertion
+      // Send Message inserting directly into Supabase via authenticated user.id
       const sendMessage = async (channelId, text, pollData = null) => {
-        if (!currentUser) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !currentUser) {
+          triggerToast('Please log in to send messages.');
+          return;
+        }
 
-        const tempId = generateUUID();
-
+        // Optimistic UI Render
+        const tempMsgId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'temp-' + Date.now();
         const optimisticMsg = {
-          id: tempId,
-          senderId: currentUser.id,
+          id: tempMsgId,
+          senderId: user.id,
           senderName: currentUser.displayName || currentUser.username || 'Sailor',
           senderAvatar: currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
           content: text,
@@ -546,28 +651,22 @@
           isOptimistic: true
         };
 
-        // 1. Render immediately on sender device
         setMessages(prev => ({
           ...prev,
           [channelId]: [...(prev[channelId] || []), optimisticMsg]
         }));
 
-        // 2. Insert into Supabase Single Source of Truth
-        if (supabase) {
-          await ensureSupabaseProfile(currentUser);
+        // Insert into Supabase DB
+        const { error } = await supabase.from('messages').insert({
+          channel_id: channelId,
+          sender_id: user.id,
+          content: text,
+          poll_data: pollData
+        });
 
-          const { error } = await supabase.from('messages').insert({
-            id: tempId,
-            channel_id: channelId,
-            sender_id: currentUser.id,
-            content: text,
-            poll_data: pollData
-          });
-
-          if (error) {
-            console.error('Supabase Sync Error:', error.message);
-            triggerToast('Message error: ' + error.message);
-          }
+        if (error) {
+          console.error('Supabase Send Error:', error.message);
+          triggerToast('Message Error: ' + error.message);
         }
       };
 
@@ -607,9 +706,9 @@
 
     const useApp = () => useContext(AppContext);
 
-    // --- Strict Sign Up / Login Screen ---
+    // --- Strict Sign Up / Login Screen with Supabase Auth ---
     const AuthModal = () => {
-      const { accounts, setAccounts, setCurrentUser, triggerToast } = useApp();
+      const { triggerToast } = useApp();
       const [isSignUp, setIsSignUp] = useState(true);
       const [username, setUsername] = useState('');
       const [displayName, setDisplayName] = useState('');
@@ -632,55 +731,36 @@
             if (cleanUser.length < 3) throw new Error('Username must be at least 3 characters.');
             if (password.length < 4) throw new Error('Password must be at least 4 characters.');
 
-            const existingAcc = accounts.find(a => a.username.toLowerCase() === cleanUser.toLowerCase());
-            if (existingAcc) {
-              throw new Error(`Username @${cleanUser} is already registered! Please switch to Log In.`);
-            }
-
-            let userId = generateUUID();
-
-            if (supabase) {
-              const { data } = await supabase.auth.signUp({
-                email: email,
-                password: password,
-                options: { data: { username: cleanUser, display_name: displayName.trim() || cleanUser } }
-              });
-              if (data?.user) {
-                userId = data.user.id;
-              }
-            }
-
-            const newProfile = {
-              id: userId,
-              username: cleanUser,
-              displayName: displayName.trim() || cleanUser,
+            const { data, error } = await supabase.auth.signUp({
+              email: email,
               password: password,
-              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-              role: cleanUser === 'Noah_' ? 'admin' : 'member',
-              customStatus: cleanUser === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor'
-            };
+              options: {
+                data: {
+                  username: cleanUser,
+                  display_name: displayName.trim() || cleanUser
+                }
+              }
+            });
 
-            setAccounts(prev => [...prev, newProfile]);
-            setCurrentUser(newProfile);
-            triggerToast(`Account created! Welcome @${cleanUser}!`);
+            if (error) throw error;
 
+            if (data?.user) {
+              await supabase.from('profiles').upsert({
+                id: data.user.id,
+                username: cleanUser,
+                display_name: displayName.trim() || cleanUser,
+                role: cleanUser === 'Noah_' ? 'admin' : 'member'
+              });
+              triggerToast(`Account created! Welcome @${cleanUser}!`);
+            }
           } else {
-            const matchedAccount = accounts.find(a => a.username.toLowerCase() === cleanUser.toLowerCase());
+            const { data, error } = await supabase.auth.signInWithPassword({
+              email: email,
+              password: password
+            });
 
-            if (!matchedAccount) {
-              throw new Error(`Account @${cleanUser} does not exist. Please Sign Up first!`);
-            }
-
-            if (matchedAccount.password && matchedAccount.password !== password) {
-              throw new Error(`Incorrect password for @${cleanUser}!`);
-            }
-
-            if (supabase) {
-              await supabase.auth.signInWithPassword({ email: email, password: password });
-            }
-
-            setCurrentUser(matchedAccount);
-            triggerToast(`Welcome back, @${matchedAccount.username}!`);
+            if (error) throw error;
+            triggerToast(`Welcome back, @${cleanUser}!`);
           }
         } catch (err) {
           setErrorMsg(err.message || 'Authentication error');
@@ -901,7 +981,7 @@
             </div>
           )}
 
-          {/* User Bottom Card */}
+          {/* User Profile Banner */}
           {currentUser && (
             <div className="p-3 bg-[#0f172a] border-t border-white/10 flex items-center justify-between">
               <div 
@@ -1120,7 +1200,7 @@
       );
     };
 
-    // --- Profile Modal ---
+    // --- User Profile Modal ---
     const ProfileModal = () => {
       const { isProfileModalOpen, setIsProfileModalOpen, currentUser, updateProfile, theme, setTheme } = useApp();
       
