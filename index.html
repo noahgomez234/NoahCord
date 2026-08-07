@@ -166,7 +166,7 @@
       <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-2xl animate-pulse mb-4 shadow-xl shadow-sky-500/30">
         NC
       </div>
-      <p class="text-gray-400 font-medium text-sm animate-pulse">Connecting to NoahCord Fleet...</p>
+      <p class="text-gray-400 font-medium text-sm animate-pulse">Connecting to NoahCord Realtime Fleet...</p>
     </div>
   </div>
 
@@ -260,6 +260,7 @@
       const [categories, setCategories] = useState(INITIAL_CATEGORIES);
       const [activeChannelId, setActiveChannelId] = useState('chan-general');
 
+      // Messages State: NO LOCALSTORAGE MESSAGES — Supabase is the single source of truth!
       const [messages, setMessages] = useState({});
 
       const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
@@ -278,25 +279,27 @@
       useEffect(() => {
         if (currentUser) {
           localStorage.setItem('noahcord_active_session', JSON.stringify(currentUser));
-          // Auto-upsert profile to Supabase to prevent Foreign Key blocks
           ensureSupabaseProfile(currentUser);
         } else {
           localStorage.removeItem('noahcord_active_session');
         }
       }, [currentUser]);
 
-      // Auto-upsert user profile to Supabase DB so message foreign key constraint passes
+      // Auto-upsert profile to Supabase DB so sender foreign key exists
       const ensureSupabaseProfile = async (userObj) => {
         if (!supabase || !userObj) return;
-        
-        await supabase.from('profiles').upsert({
-          id: userObj.id,
-          username: userObj.username,
-          display_name: userObj.displayName || userObj.username,
-          avatar_url: userObj.avatar,
-          custom_status: userObj.customStatus || '⛵ Sailor',
-          role: userObj.role || 'member'
-        });
+        try {
+          await supabase.from('profiles').upsert({
+            id: userObj.id,
+            username: userObj.username,
+            display_name: userObj.displayName || userObj.username,
+            avatar_url: userObj.avatar,
+            custom_status: userObj.customStatus || '⛵ Sailor',
+            role: userObj.role || 'member'
+          });
+        } catch (e) {
+          console.warn("Profile sync notice:", e);
+        }
       };
 
       // Restore Supabase Auth Session
@@ -337,53 +340,131 @@
         }
       };
 
-      // Multi-Device Live Realtime Sync
+      // Load Messages Directly From Supabase for Channel
+      const loadChannelMessages = async (chanId) => {
+        if (!supabase) return;
+
+        // Fetch profiles for sender metadata
+        const { data: profs } = await supabase.from('profiles').select('*');
+        const profMap = {};
+        if (profs) {
+          profs.forEach(p => { profMap[p.id] = p; });
+          setAccounts(profs.map(p => ({
+            id: p.id,
+            username: p.username,
+            displayName: p.display_name || p.username || 'Sailor',
+            avatar: p.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+            role: p.role,
+            customStatus: p.custom_status || '⛵ Sailor'
+          })));
+        }
+
+        const { data: msgs, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('channel_id', chanId)
+          .order('created_at', { ascending: true });
+
+        if (!error && msgs) {
+          const formatted = msgs.map(m => {
+            const sender = profMap[m.sender_id];
+            return {
+              id: m.id,
+              senderId: m.sender_id,
+              senderName: sender?.display_name || sender?.username || 'Sailor',
+              senderAvatar: sender?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+              content: m.content || '',
+              timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              poll: m.poll_data
+            };
+          });
+
+          setMessages(prev => ({
+            ...prev,
+            [chanId]: formatted
+          }));
+        }
+      };
+
+      // Realtime Messages Subscription Across Devices
       useEffect(() => {
         if (!currentUser || !supabase) return;
 
-        const loadMessagesAndProfiles = async () => {
-          const { data: profs } = await supabase.from('profiles').select('*');
-          if (profs && profs.length > 0) {
-            setAccounts(profs.map(p => ({
-              id: p.id,
-              username: p.username,
-              displayName: p.display_name || p.username || 'Sailor',
-              avatar: p.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-              role: p.role,
-              customStatus: p.custom_status || '⛵ Sailor'
-            })));
-          }
+        // Fetch latest messages from Supabase single source of truth
+        loadChannelMessages(activeChannelId);
 
-          const { data: msgs } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
-          if (msgs) {
-            const grouped = {};
-            msgs.forEach(m => {
-              const chanKey = m.channel_id || 'chan-general';
-              if (!grouped[chanKey]) grouped[chanKey] = [];
-              
-              const sender = profs?.find(p => p.id === m.sender_id);
-              grouped[chanKey].push({
-                id: m.id,
-                senderId: m.sender_id,
-                senderName: sender ? (sender.display_name || sender.username) : 'Sailor',
-                senderAvatar: sender?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-                content: m.content || '',
-                timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                poll: m.poll_data
+        // Realtime Subscription
+        const channel = supabase.channel(`realtime:messages:${activeChannelId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'messages',
+              filter: `channel_id=eq.${activeChannelId}`
+            },
+            async (payload) => {
+              const newMsg = payload.new;
+
+              // Fetch sender details
+              let senderName = 'Sailor';
+              let senderAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
+
+              const { data: senderProf } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', newMsg.sender_id)
+                .single();
+
+              if (senderProf) {
+                senderName = senderProf.display_name || senderProf.username || 'Sailor';
+                senderAvatar = senderProf.avatar_url || senderAvatar;
+              }
+
+              const formattedMsg = {
+                id: newMsg.id,
+                senderId: newMsg.sender_id,
+                senderName,
+                senderAvatar,
+                content: newMsg.content || '',
+                timestamp: new Date(newMsg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                poll: newMsg.poll_data
+              };
+
+              setMessages(prev => {
+                const currentList = prev[activeChannelId] || [];
+
+                // Deduplicate by ID
+                if (currentList.some(m => m.id === formattedMsg.id)) {
+                  return prev;
+                }
+
+                // Merge / Replace optimistic message if match found
+                const optIndex = currentList.findIndex(
+                  m => m.isOptimistic && m.senderId === formattedMsg.senderId && m.content === formattedMsg.content
+                );
+
+                let newList;
+                if (optIndex !== -1) {
+                  newList = [...currentList];
+                  newList[optIndex] = formattedMsg;
+                } else {
+                  newList = [...currentList, formattedMsg];
+                }
+
+                return {
+                  ...prev,
+                  [activeChannelId]: newList
+                };
               });
-            });
-            setMessages(grouped);
-          }
-        };
-
-        loadMessagesAndProfiles();
-
-        // Subscribe to live WebSocket messages broadcast across devices
-        const channel = supabase.channel('messages_realtime_broadcast')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-            loadMessagesAndProfiles();
-          })
-          .subscribe();
+            }
+          )
+          .subscribe((status) => {
+            if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+              // Auto-reconnect on connection drop
+              setTimeout(() => loadChannelMessages(activeChannelId), 2000);
+            }
+          });
 
         return () => {
           supabase.removeChannel(channel);
@@ -447,34 +528,35 @@
         triggerToast('Profile updated!');
       };
 
-      // Multi-Device Instant Broadcast
+      // Send Message function with Optimistic Rendering & Supabase Insertion
       const sendMessage = async (channelId, text, pollData = null) => {
         if (!currentUser) return;
 
-        const newMsgId = generateUUID(); // Valid RFC4122 UUID for Postgres
+        const tempId = generateUUID();
 
-        const newMsg = {
-          id: newMsgId,
+        const optimisticMsg = {
+          id: tempId,
           senderId: currentUser.id,
           senderName: currentUser.displayName || currentUser.username || 'Sailor',
           senderAvatar: currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
           content: text,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          poll: pollData
+          poll: pollData,
+          isOptimistic: true
         };
 
-        // Instant local update
+        // 1. Render immediately on sender device
         setMessages(prev => ({
           ...prev,
-          [channelId]: [...(prev[channelId] || []), newMsg]
+          [channelId]: [...(prev[channelId] || []), optimisticMsg]
         }));
 
-        // Send to Supabase DB for cross-device sync
+        // 2. Insert into Supabase Single Source of Truth
         if (supabase) {
           await ensureSupabaseProfile(currentUser);
 
           const { error } = await supabase.from('messages').insert({
-            id: newMsgId,
+            id: tempId,
             channel_id: channelId,
             sender_id: currentUser.id,
             content: text,
@@ -483,6 +565,7 @@
 
           if (error) {
             console.error('Supabase Sync Error:', error.message);
+            triggerToast('Message error: ' + error.message);
           }
         }
       };
@@ -553,7 +636,7 @@
               throw new Error(`Username @${cleanUser} is already registered! Please switch to Log In.`);
             }
 
-            let userId = generateUUID(); // RFC4122 Valid UUID
+            let userId = generateUUID();
 
             if (supabase) {
               const { data } = await supabase.auth.signUp({
@@ -817,7 +900,7 @@
             </div>
           )}
 
-          {/* User Profile Banner */}
+          {/* User Bottom Card */}
           {currentUser && (
             <div className="p-3 bg-[#0f172a] border-t border-white/10 flex items-center justify-between">
               <div 
@@ -1036,7 +1119,7 @@
       );
     };
 
-    // --- User Profile Modal ---
+    // --- Profile Modal ---
     const ProfileModal = () => {
       const { isProfileModalOpen, setIsProfileModalOpen, currentUser, updateProfile, theme, setTheme } = useApp();
       
@@ -1225,7 +1308,7 @@
                 <ChannelListSidebar />
               </div>
 
-              {/* Main Workspace Workspace */}
+              {/* Main Workspace */}
               <div className="flex-1 flex h-full overflow-hidden w-full">
                 <ChatWindow />
 
