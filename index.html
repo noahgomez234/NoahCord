@@ -2,8 +2,8 @@
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NoahCord — Premium Messaging Platform</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>NoahCord — Next-Gen Messaging Platform</title>
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -55,7 +55,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <!-- React 18, ReactDOM, Babel, Supabase -->
+  <!-- React 18, ReactDOM, Babel, Supabase JS -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
@@ -119,18 +119,19 @@
       user-select: none;
       margin: 0;
       padding: 0;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .glass-panel {
-      background: rgba(15, 23, 42, 0.75);
+      background: rgba(15, 23, 42, 0.85);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--color-border);
     }
 
     ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
+      width: 4px;
+      height: 4px;
     }
     ::-webkit-scrollbar-track {
       background: transparent;
@@ -147,7 +148,7 @@
       if (errDiv) {
         errDiv.style.display = 'block';
         errDiv.innerHTML = '<div style="padding:20px; background:#090d16; color:#f87171; font-family:monospace; z-index:9999; position:fixed; inset:0;">' +
-          '<h2>NoahCord Handled Error</h2>' +
+          '<h2>NoahCord Exception</h2>' +
           '<p>' + msg + '</p>' +
           '<p>Line: ' + line + ' | Col: ' + col + '</p>' +
           '<button onclick="location.reload()" style="background:#0ea5e9;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;margin-top:12px;">Reload Application</button>' +
@@ -161,7 +162,7 @@
   <div id="fatal-error" style="display:none;"></div>
   
   <div id="root">
-    <div class="flex flex-col items-center justify-center h-screen bg-[#080b12] text-white">
+    <div class="flex flex-col items-center justify-center h-screen h-[100dvh] bg-[#080b12] text-white">
       <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-2xl animate-pulse mb-4 shadow-xl shadow-sky-500/30">
         NC
       </div>
@@ -197,6 +198,7 @@
         sidebar: <g><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="3" x2="9" y2="21" /></g>,
         chevronDown: <polyline points="6 9 12 15 18 9" />,
         chevronRight: <polyline points="9 18 15 12 9 6" />,
+        menu: <g><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" /></g>,
         gif: <g><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M8 10H6v4h2v-2H7M12 10v4M15 10h3v1.5h-2v1H18V14h-3" /></g>
       };
 
@@ -233,20 +235,18 @@
 
     const DEFAULT_MESSAGES = {
       'chan-general': [
-        { id: 'm1', senderId: 'usr-noah', senderName: 'Noah_', senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', content: 'Welcome to **Sailors** ⚓! Sign up or log in to test live chat.', timestamp: '12:00 PM' }
+        { id: 'm1', senderId: 'usr-noah', senderName: 'Noah_', senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', content: 'Welcome to **Sailors** ⚓! Send a message below to test chat.', timestamp: '12:00 PM' }
       ]
     };
 
     const AppContext = createContext(null);
 
     const AppProvider = ({ children }) => {
-      // 1. Session Persistence
       const [currentUser, setCurrentUser] = useState(() => {
         const saved = localStorage.getItem('noahcord_active_session');
         return saved ? JSON.parse(saved) : null;
       });
 
-      // 2. Registered Accounts Database
       const [accounts, setAccounts] = useState(() => {
         const saved = localStorage.getItem('noahcord_registered_accounts');
         return saved ? JSON.parse(saved) : DEFAULT_ACCOUNTS;
@@ -256,7 +256,6 @@
       const [categories, setCategories] = useState(INITIAL_CATEGORIES);
       const [activeChannelId, setActiveChannelId] = useState('chan-general');
 
-      // 3. Persistent Messages State
       const [messages, setMessages] = useState(() => {
         const saved = localStorage.getItem('noahcord_saved_messages');
         return saved ? JSON.parse(saved) : DEFAULT_MESSAGES;
@@ -264,7 +263,11 @@
 
       const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
       const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-      const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
+      
+      // Mobile Drawer States
+      const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+      const [rightSidebarOpen, setRightSidebarOpen] = useState(false); // Default closed on mobile
+
       const [logoClickCount, setLogoClickCount] = useState(0);
       const [toastMsg, setToastMsg] = useState(null);
       const [activeVoiceCall, setActiveVoiceCall] = useState(null);
@@ -317,14 +320,13 @@
         if (supabase) await supabase.auth.signOut();
         localStorage.removeItem('noahcord_active_session');
         setCurrentUser(null);
+        setMobileMenuOpen(false);
         triggerToast('Logged out successfully.');
       };
 
       const updateProfile = async (updates) => {
         const updated = { ...currentUser, ...updates };
         setCurrentUser(updated);
-
-        // Update accounts list
         setAccounts(prev => prev.map(a => a.id === currentUser.id ? { ...a, ...updates } : a));
 
         if (supabase && currentUser.id) {
@@ -355,13 +357,11 @@
           poll: pollData
         };
 
-        // 1. INSTANT LOCAL STATE & LOCALSTORAGE PERSISTENCE
         setMessages(prev => ({
           ...prev,
           [channelId]: [...(prev[channelId] || []), newMsg]
         }));
 
-        // 2. Background sync to Supabase
         if (supabase && currentUser.id) {
           const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(channelId);
           const payload = {
@@ -399,6 +399,7 @@
           isAdminModalOpen, setIsAdminModalOpen,
           isProfileModalOpen, setIsProfileModalOpen,
           rightSidebarOpen, setRightSidebarOpen,
+          mobileMenuOpen, setMobileMenuOpen,
           activeVoiceCall, setActiveVoiceCall,
           handleLogoClick, logoClickCount,
           toastMsg, triggerToast
@@ -426,16 +427,15 @@
         setLoading(true);
 
         const inputRaw = username.trim();
-        const cleanUser = inputRaw.includes('@') ? inputRaw.split('@')[0] : inputRaw;
-        const email = inputRaw.includes('@') ? inputRaw : `${cleanUser.toLowerCase().replace(/[^a-z0-9_]/g, '')}@noahcord.com`;
+        const isEmail = inputRaw.includes('@');
+        const cleanUser = isEmail ? inputRaw.split('@')[0] : inputRaw;
+        const email = isEmail ? inputRaw : `${cleanUser.toLowerCase().replace(/[^a-z0-9_]/g, '')}@noahcord.com`;
 
         try {
           if (isSignUp) {
-            // --- SIGN UP ---
             if (cleanUser.length < 3) throw new Error('Username must be at least 3 characters.');
             if (password.length < 4) throw new Error('Password must be at least 4 characters.');
 
-            // Check if username already exists
             const existingAcc = accounts.find(a => a.username.toLowerCase() === cleanUser.toLowerCase());
             if (existingAcc) {
               throw new Error(`Username @${cleanUser} is already registered! Please switch to Log In.`);
@@ -462,13 +462,11 @@
               }
             }
 
-            // Save new account into accounts list
             setAccounts(prev => [...prev, newProfile]);
             setCurrentUser(newProfile);
             triggerToast(`Account created! Welcome @${cleanUser}!`);
 
           } else {
-            // --- STRICT LOG IN ---
             const matchedAccount = accounts.find(a => a.username.toLowerCase() === cleanUser.toLowerCase());
 
             if (!matchedAccount) {
@@ -495,12 +493,12 @@
 
       return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f172a]/90 border border-white/10 w-full max-w-md rounded-3xl p-8 shadow-2xl space-y-6 glass-panel animate-fade-in">
+          <div className="bg-[#0f172a]/90 border border-white/10 w-full max-w-md rounded-3xl p-6 md:p-8 shadow-2xl space-y-6 glass-panel animate-fade-in mx-4">
             <div className="text-center space-y-2">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-2xl mx-auto shadow-xl shadow-sky-500/30">
+              <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-2xl mx-auto shadow-xl shadow-sky-500/30">
                 NC
               </div>
-              <h2 className="text-2xl font-extrabold text-gray-100 tracking-tight">Welcome to NoahCord</h2>
+              <h2 className="text-xl md:text-2xl font-extrabold text-gray-100 tracking-tight">Welcome to NoahCord</h2>
               <p className="text-xs text-gray-400">Join the official <span className="text-sky-400 font-semibold">Sailors ⚓</span> fleet server</p>
             </div>
 
@@ -538,7 +536,7 @@
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="e.g. Noah_ or sailor_jack"
-                    className="w-full bg-[#1e293b] border border-white/10 rounded-xl pl-8 pr-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-sky-500"
+                    className="w-full bg-[#1e293b] border border-white/10 rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-sky-500"
                   />
                 </div>
               </div>
@@ -551,7 +549,7 @@
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="e.g. Captain Jack"
-                    className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-sky-500"
+                    className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-sky-500"
                   />
                 </div>
               )}
@@ -564,14 +562,14 @@
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-sky-500"
+                  className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-sky-500"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-sm py-3 rounded-xl transition shadow-lg mt-2"
+                className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white font-bold text-sm py-3 rounded-xl transition shadow-lg mt-2 active:scale-95"
               >
                 {loading ? 'Authenticating...' : isSignUp ? 'Create Account & Join Sailors ⚓' : 'Log In & Enter Sailors ⚓'}
               </button>
@@ -590,22 +588,22 @@
       const { handleLogoClick, setIsProfileModalOpen } = useApp();
 
       return (
-        <div className="w-18 md:w-20 bg-[#0f172a]/90 border-r border-white/10 flex flex-col items-center py-4 justify-between select-none z-20 glass-panel">
+        <div className="w-16 md:w-20 bg-[#0f172a]/90 border-r border-white/10 flex flex-col items-center py-4 justify-between select-none z-20 glass-panel h-full">
           <div className="flex flex-col items-center gap-4 w-full">
             <div 
               onClick={handleLogoClick}
               className="relative group cursor-pointer"
               title="Click 10x for Noah_ Fleet Admin Panel"
             >
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xl shadow-sky-500/20 group-hover:scale-105 transition-all duration-300">
-                <span className="font-black text-xl tracking-tighter">NC</span>
+              <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xl shadow-sky-500/20 group-hover:scale-105 transition-all duration-300">
+                <span className="font-black text-lg md:text-xl tracking-tighter">NC</span>
               </div>
             </div>
 
             <div className="w-8 h-[1px] bg-white/10" />
 
-            <button className="relative group w-12 h-12 rounded-2xl flex items-center justify-center bg-sky-500 text-white shadow-lg scale-105">
-              <span className="text-xl">⚓</span>
+            <button className="relative group w-11 h-11 md:w-12 md:h-12 rounded-2xl flex items-center justify-center bg-sky-500 text-white shadow-lg scale-105">
+              <span className="text-lg md:text-xl">⚓</span>
             </button>
           </div>
 
@@ -622,11 +620,11 @@
 
     // --- Channel Sidebar ---
     const ChannelListSidebar = () => {
-      const { categories, activeChannelId, setActiveChannelId, currentUser, setIsAdminModalOpen, setIsProfileModalOpen, setActiveVoiceCall, activeVoiceCall, logout } = useApp();
+      const { categories, activeChannelId, setActiveChannelId, currentUser, setIsAdminModalOpen, setIsProfileModalOpen, setActiveVoiceCall, activeVoiceCall, setMobileMenuOpen, logout } = useApp();
       const [collapsedCat, setCollapsedCat] = useState({});
 
       return (
-        <div className="w-60 md:w-64 bg-[#0f172a]/80 border-r border-white/10 flex flex-col h-full select-none glass-panel">
+        <div className="w-56 md:w-64 bg-[#0f172a]/95 border-r border-white/10 flex flex-col h-full select-none glass-panel">
           <div className="h-16 px-4 border-b border-white/10 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-2">
               <span className="text-2xl">⚓</span>
@@ -675,9 +673,10 @@
                           key={chan.id}
                           onClick={() => {
                             setActiveChannelId(chan.id);
+                            setMobileMenuOpen(false); // Auto-close mobile drawer on selection
                             if (isVoice) setActiveVoiceCall({ channelName: chan.name });
                           }}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-sm transition ${
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-sm transition ${
                             isActive ? 'bg-sky-500/20 text-white font-semibold border border-sky-500/30' : 'text-gray-400 hover:bg-[#1e293b]/60 hover:text-gray-200'
                           }`}
                         >
@@ -708,7 +707,7 @@
           {currentUser && (
             <div className="p-3 bg-[#0f172a] border-t border-white/10 flex items-center justify-between">
               <div 
-                onClick={() => setIsProfileModalOpen(true)}
+                onClick={() => { setIsProfileModalOpen(true); setMobileMenuOpen(false); }}
                 className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:opacity-80 transition"
               >
                 <div className="relative">
@@ -733,9 +732,9 @@
       );
     };
 
-    // --- Chat Window with Ultra-Tight Consecutive Message Spacing ---
+    // --- Chat Window Component ---
     const ChatWindow = () => {
-      const { categories, activeChannelId, messages, sendMessage, rightSidebarOpen, setRightSidebarOpen } = useApp();
+      const { categories, activeChannelId, messages, sendMessage, rightSidebarOpen, setRightSidebarOpen, setMobileMenuOpen } = useApp();
       const [input, setInput] = useState('');
       const [showGiphy, setShowGiphy] = useState(false);
       const chatEndRef = useRef(null);
@@ -771,53 +770,61 @@
       };
 
       return (
-        <div className="flex-1 flex flex-col h-full bg-[#080b12] relative overflow-hidden">
-          {/* Header */}
-          <div className="h-16 border-b border-white/10 px-6 flex items-center justify-between bg-[#0f172a]/40 backdrop-blur-md">
-            <div className="flex items-center gap-2">
-              <Icon name={activeChan?.type === 'voice' ? 'volume2' : 'hash'} className="text-sky-400" size={22} />
-              <div>
-                <h3 className="font-bold text-gray-100 text-sm">{activeChan?.name}</h3>
-                <p className="text-xs text-gray-400">{activeChan?.desc}</p>
+        <div className="flex-1 flex flex-col h-full bg-[#080b12] relative overflow-hidden w-full">
+          {/* Mobile + Desktop Responsive Header */}
+          <div className="h-16 border-b border-white/10 px-4 md:px-6 flex items-center justify-between bg-[#0f172a]/40 backdrop-blur-md">
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Mobile Hamburger Button */}
+              <button 
+                onClick={() => setMobileMenuOpen(true)} 
+                className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-[#1e293b] md:hidden shrink-0"
+              >
+                <Icon name="menu" size={20} />
+              </button>
+
+              <Icon name={activeChan?.type === 'voice' ? 'volume2' : 'hash'} className="text-sky-400 shrink-0" size={20} />
+              <div className="min-w-0">
+                <h3 className="font-bold text-gray-100 text-sm truncate">{activeChan?.name}</h3>
+                <p className="text-[11px] text-gray-400 truncate hidden sm:block">{activeChan?.desc}</p>
               </div>
             </div>
 
             <button onClick={() => setRightSidebarOpen(!rightSidebarOpen)} className={`p-2 rounded-xl transition ${rightSidebarOpen ? 'bg-sky-500/20 text-sky-400' : 'text-gray-400 hover:text-white'}`}>
-              <Icon name="sidebar" size={18} />
+              <Icon name="users" size={18} />
             </button>
           </div>
 
-          {/* Messages Stream: Grouped consecutive messages have ultra-tight 2px spacing */}
-          <div className="flex-1 overflow-y-auto p-6">
+          {/* Messages Stream */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-6">
             {chanMessages.map((msg, idx) => {
               const prevMsg = chanMessages[idx - 1];
               const isGrouped = prevMsg && prevMsg.senderId === msg.senderId;
 
               if (isGrouped) {
                 return (
-                  <div key={msg.id} className="group relative flex items-start gap-3 hover:bg-white/[0.02] px-3 py-[1px] my-[1px] rounded-lg transition duration-150">
-                    <div className="w-9 shrink-0 text-[10px] text-gray-500/60 text-right pr-1 select-none opacity-0 group-hover:opacity-100 font-mono pt-0.5 leading-tight">
+                  <div key={msg.id} className="group relative flex items-start gap-3 hover:bg-white/[0.02] px-2 md:px-3 py-[1px] my-[1px] rounded-lg transition duration-150">
+                    <div className="w-8 md:w-9 shrink-0 text-[10px] text-gray-500/60 text-right pr-1 select-none opacity-0 group-hover:opacity-100 font-mono pt-0.5 leading-tight">
                       {msg.timestamp}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs text-gray-300 leading-normal break-words">{msg.content}</div>
+                      <div className="text-xs md:text-sm text-gray-300 leading-normal break-words">{msg.content}</div>
                     </div>
                   </div>
                 );
               }
 
               return (
-                <div key={msg.id} className="group relative flex items-start gap-3 hover:bg-white/[0.03] px-3 pt-2.5 pb-1 mt-4 rounded-xl transition duration-150 border-t border-white/[0.02]">
-                  <img src={msg.senderAvatar} className="w-9 h-9 rounded-xl object-cover ring-1 ring-white/10 shrink-0" alt="" />
+                <div key={msg.id} className="group relative flex items-start gap-3 hover:bg-white/[0.03] px-2 md:px-3 pt-2.5 pb-1 mt-4 rounded-xl transition duration-150 border-t border-white/[0.02]">
+                  <img src={msg.senderAvatar} className="w-8 h-8 md:w-9 md:h-9 rounded-xl object-cover ring-1 ring-white/10 shrink-0" alt="" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-bold text-xs text-gray-200 hover:underline cursor-pointer">{msg.senderName}</span>
+                      <span className="font-bold text-xs md:text-sm text-gray-200 hover:underline cursor-pointer">{msg.senderName}</span>
                       {msg.senderName.includes('Noah_') && (
-                        <span className="bg-sky-500/20 text-sky-400 text-[10px] px-1.5 py-0.5 rounded font-semibold border border-sky-500/30">Fleet Admin</span>
+                        <span className="bg-sky-500/20 text-sky-400 text-[9px] md:text-[10px] px-1.5 py-0.5 rounded font-semibold border border-sky-500/30">Fleet Admin</span>
                       )}
                       <span className="text-[10px] text-gray-500 font-medium">{msg.timestamp}</span>
                     </div>
-                    <div className="text-xs text-gray-300 leading-normal break-words">{msg.content}</div>
+                    <div className="text-xs md:text-sm text-gray-300 leading-normal break-words">{msg.content}</div>
 
                     {msg.poll && (
                       <div className="mt-2 bg-[#0f172a] border border-white/10 p-3 rounded-xl max-w-sm space-y-1">
@@ -837,9 +844,9 @@
             <div ref={chatEndRef} />
           </div>
 
-          {/* GIPHY Drawer */}
+          {/* GIPHY Search Drawer */}
           {showGiphy && (
-            <div className="absolute bottom-20 right-6 bg-[#0f172a] border border-white/10 p-3 rounded-2xl shadow-2xl z-30 w-72 space-y-2 glass-panel">
+            <div className="absolute bottom-20 right-4 md:right-6 bg-[#0f172a] border border-white/10 p-3 rounded-2xl shadow-2xl z-30 w-72 space-y-2 glass-panel">
               <div className="text-xs font-bold text-gray-400 uppercase">GIPHY Search</div>
               <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                 {[
@@ -853,22 +860,22 @@
             </div>
           )}
 
-          {/* Input Dock */}
-          <div className="p-4 bg-[#0f172a]/40 backdrop-blur-md border-t border-white/10">
-            <form onSubmit={handleSend} className="flex items-center bg-[#0f172a] border border-white/10 rounded-2xl p-2 focus-within:border-sky-500 transition shadow-inner">
+          {/* Touch-Friendly Chat Input Bar */}
+          <div className="p-3 md:p-4 bg-[#0f172a]/40 backdrop-blur-md border-t border-white/10 pb-safe">
+            <form onSubmit={handleSend} className="flex items-center bg-[#0f172a] border border-white/10 rounded-2xl p-1.5 md:p-2 focus-within:border-sky-500 transition shadow-inner">
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={`Message #${activeChan?.name} in Sailors... (Try /poll or /shrug)`}
-                className="flex-1 bg-transparent px-3 text-sm text-gray-100 placeholder-gray-500 focus:outline-none"
+                placeholder={`Message #${activeChan?.name}...`}
+                className="flex-1 bg-transparent px-2 md:px-3 text-xs md:text-sm text-gray-100 placeholder-gray-500 focus:outline-none"
               />
 
               <div className="flex items-center gap-1">
                 <button type="button" onClick={() => setShowGiphy(!showGiphy)} className="p-2 text-gray-400 hover:text-white rounded-xl">
                   <Icon name="gif" size={18} />
                 </button>
-                <button type="submit" disabled={!input.trim()} className="p-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white transition shadow-md">
+                <button type="submit" disabled={!input.trim()} className="p-2 md:p-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white transition shadow-md active:scale-95">
                   <Icon name="send" size={16} />
                 </button>
               </div>
@@ -878,14 +885,12 @@
       );
     };
 
-    // --- Right Sidebar ---
+    // --- Right Sidebar Component ---
     const RightSidebar = () => {
-      const { rightSidebarOpen, accounts } = useApp();
-
-      if (!rightSidebarOpen) return null;
+      const { accounts } = useApp();
 
       return (
-        <div className="w-60 bg-[#0f172a]/80 border-l border-white/10 flex flex-col h-full select-none glass-panel p-4 space-y-4">
+        <div className="w-60 bg-[#0f172a]/90 border-l border-white/10 flex flex-col h-full select-none glass-panel p-4 space-y-4">
           <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Registered Users — {accounts.length}</div>
           <div className="space-y-2 overflow-y-auto">
             {accounts.map(usr => (
@@ -944,26 +949,26 @@
 
       return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[#0f172a] border border-white/10 w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl glass-panel flex flex-col max-h-[90vh]">
+          <div className="bg-[#0f172a] border border-white/10 w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl glass-panel flex flex-col max-h-[90vh] mx-2">
             
-            <div className="h-28 relative bg-gradient-to-r from-sky-500 to-indigo-600">
+            <div className="h-24 md:h-28 relative bg-gradient-to-r from-sky-500 to-indigo-600 shrink-0">
               {banner && <img src={banner} className="w-full h-full object-cover" alt="" />}
               <button onClick={() => setIsProfileModalOpen(false)} className="absolute top-3 right-3 p-1.5 rounded-full bg-black/40 text-white hover:bg-black/60"><Icon name="x" size={18} /></button>
             </div>
 
-            <div className="px-6 relative -mt-10 mb-2 flex justify-between items-end">
+            <div className="px-6 relative -mt-8 mb-2 flex justify-between items-end shrink-0">
               <div className="relative">
-                <img src={avatar} className="w-20 h-20 rounded-2xl object-cover ring-4 ring-[#0f172a] shadow-xl" alt="" />
-                <span className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0f172a]" />
+                <img src={avatar} className="w-16 h-16 md:w-20 md:h-20 rounded-2xl object-cover ring-4 ring-[#0f172a] shadow-xl" alt="" />
+                <span className="absolute bottom-1 right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0f172a]" />
               </div>
               <div className="text-right">
-                <h3 className="font-bold text-gray-100 text-lg">{displayName}</h3>
+                <h3 className="font-bold text-gray-100 text-base md:text-lg">{displayName}</h3>
                 <p className="text-xs text-gray-400">@{username}</p>
               </div>
             </div>
 
-            <form onSubmit={handleSave} className="p-6 overflow-y-auto space-y-4 flex-1">
-              <div className="grid grid-cols-2 gap-3">
+            <form onSubmit={handleSave} className="p-4 md:p-6 overflow-y-auto space-y-4 flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-gray-400">Display Name</label>
                   <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-100" />
@@ -974,7 +979,7 @@
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-gray-400">Pronouns</label>
                   <input type="text" value={pronouns} onChange={(e) => setPronouns(e.target.value)} placeholder="he/him, she/her, they/them" className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-100" />
@@ -1036,17 +1041,17 @@
 
       return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f172a] border border-sky-500/40 w-full max-w-xl rounded-3xl p-6 shadow-2xl space-y-6 glass-panel">
+          <div className="bg-[#0f172a] border border-sky-500/40 w-full max-w-xl rounded-3xl p-6 shadow-2xl space-y-6 glass-panel mx-2">
             <div className="flex items-center justify-between pb-4 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <Icon name="crown" size={20} className="text-amber-400" />
-                <h2 className="font-extrabold text-lg text-gray-100">Sailors Admin Panel (@{currentUser?.username})</h2>
+                <h2 className="font-extrabold text-base md:text-lg text-gray-100">Sailors Admin Panel (@{currentUser?.username})</h2>
               </div>
               <button onClick={() => setIsAdminModalOpen(false)} className="text-gray-400 hover:text-white"><Icon name="x" size={20} /></button>
             </div>
 
             <form onSubmit={(e) => { e.preventDefault(); if (chanName) { addChannel(catName, chanName); setChanName(''); } }} className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <select value={catName} onChange={(e) => setCatName(e.target.value)} className="bg-[#1e293b] border border-white/10 rounded-xl p-2 text-xs text-gray-100">
                   {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
@@ -1067,10 +1072,10 @@
 
     // --- Main App Root ---
     const MainApp = () => {
-      const { currentUser, toastMsg } = useApp();
+      const { currentUser, toastMsg, mobileMenuOpen, setMobileMenuOpen, rightSidebarOpen, setRightSidebarOpen } = useApp();
 
       return (
-        <div className="flex h-screen w-screen overflow-hidden bg-[#080b12] text-gray-100 relative">
+        <div className="flex h-screen h-[100dvh] w-screen overflow-hidden bg-[#080b12] text-gray-100 relative">
           {toastMsg && (
             <div className="absolute top-4 right-4 bg-sky-500 text-white px-4 py-2 rounded-2xl shadow-2xl z-50 text-xs font-bold border border-white/20">
               <Icon name="sparkles" size={16} /> {toastMsg}
@@ -1081,12 +1086,42 @@
             <AuthModal />
           ) : (
             <>
-              <ServerSidebar />
-              <ChannelListSidebar />
-              <div className="flex-1 flex h-full overflow-hidden">
-                <ChatWindow />
-                <RightSidebar />
+              {/* Mobile Left Drawer Backdrop */}
+              {mobileMenuOpen && (
+                <div 
+                  onClick={() => setMobileMenuOpen(false)} 
+                  className="fixed inset-0 bg-black/70 backdrop-blur-sm z-30 md:hidden animate-fade-in"
+                />
+              )}
+
+              {/* Combined Left Sidebars */}
+              <div className={`fixed inset-y-0 left-0 z-40 flex h-full transition-transform duration-300 md:relative md:translate-x-0 ${
+                mobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
+              }`}>
+                <ServerSidebar />
+                <ChannelListSidebar />
               </div>
+
+              {/* Main Workspace */}
+              <div className="flex-1 flex h-full overflow-hidden w-full">
+                <ChatWindow />
+
+                {/* Mobile Right Sidebar Backdrop */}
+                {rightSidebarOpen && (
+                  <div 
+                    onClick={() => setRightSidebarOpen(false)} 
+                    className="fixed inset-0 bg-black/70 backdrop-blur-sm z-30 md:hidden animate-fade-in"
+                  />
+                )}
+
+                {/* Right Member Sidebar */}
+                <div className={`fixed inset-y-0 right-0 z-40 h-full transition-transform duration-300 md:relative md:translate-x-0 ${
+                  rightSidebarOpen ? 'translate-x-0 shadow-2xl' : 'translate-x-full md:hidden'
+                }`}>
+                  <RightSidebar />
+                </div>
+              </div>
+
               <AdminPanelModal />
               <ProfileModal />
             </>
