@@ -1,4 +1,96 @@
 
+================================================================================
+  NOAHCORD — SUPABASE DATABASE SETUP INSTRUCTIONS
+================================================================================
+
+1. Open your Supabase Project Dashboard: https://hcmglicybaitjqwkqice.supabase.co
+2. Navigate to "SQL Editor" -> "New Query".
+3. Paste and run the following SQL script to create the tables, triggers, and RLS policies:
+
+-- =============================================================================
+-- SQL MIGRATION SCRIPT (Copy & Paste into Supabase SQL Editor)
+-- =============================================================================
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 1. PROFILES TABLE
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  username TEXT UNIQUE NOT NULL,
+  display_name TEXT NOT NULL,
+  avatar_url TEXT,
+  banner_url TEXT,
+  bio TEXT DEFAULT '',
+  pronouns TEXT DEFAULT '',
+  role TEXT DEFAULT 'member' CHECK (role IN ('member', 'admin')),
+  accent_color TEXT DEFAULT '#0ea5e9',
+  theme_preference TEXT DEFAULT 'midnight',
+  status TEXT DEFAULT 'online' CHECK (status IN ('online', 'idle', 'dnd', 'offline')),
+  custom_status TEXT DEFAULT '',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 2. SERVERS & CHANNELS
+CREATE TABLE IF NOT EXISTS public.servers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  owner_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.channels (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  server_id UUID NOT NULL REFERENCES public.servers(id) ON DELETE CASCADE,
+  category_name TEXT DEFAULT 'Deck Operations',
+  name TEXT NOT NULL,
+  type TEXT DEFAULT 'text' CHECK (type IN ('text', 'voice', 'announcement')),
+  topic TEXT DEFAULT '',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 3. MESSAGES TABLE
+CREATE TABLE IF NOT EXISTS public.messages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  channel_id UUID REFERENCES public.channels(id) ON DELETE CASCADE,
+  sender_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  content TEXT DEFAULT '',
+  attachment_url TEXT,
+  poll_data JSONB,
+  is_pinned BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- ROW LEVEL SECURITY (RLS) POLICIES
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.servers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.channels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public Profiles Viewable" ON public.profiles FOR SELECT USING (true);
+CREATE POLICY "Users Update Own Profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Messages Viewable" ON public.messages FOR SELECT USING (true);
+CREATE POLICY "Users Insert Messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+
+-- Only Noah_ / Admin can manage servers & channels
+CREATE OR REPLACE FUNCTION public.is_noah_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND (username = 'Noah_' OR role = 'admin')
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE POLICY "Noah Admin Server Control" ON public.servers FOR ALL USING (public.is_noah_admin());
+CREATE POLICY "Noah Admin Channel Control" ON public.channels FOR ALL USING (public.is_noah_admin());
+
+-- 4. STORAGE BUCKETS
+INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', true), ('attachments', 'attachments', true) ON CONFLICT (id) DO NOTHING;
+
+================================================================================
+-->
 
 <!DOCTYPE html>
 <html lang="en" class="dark">
@@ -31,12 +123,7 @@
               accent: 'var(--color-accent, #0ea5e9)',
             }
           },
-          borderRadius: {
-            '2xl': '16px',
-            '3xl': '22px',
-          },
           animation: {
-            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
             'bounce-subtle': 'bounce 2s infinite',
             'fade-in': 'fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
             'slide-up': 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
@@ -61,15 +148,16 @@
     }
   </script>
 
-  <!-- Google Fonts (Inter + JetBrains Mono) -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <!-- React 18, ReactDOM, Babel Standalone -->
+  <!-- React 18, ReactDOM, Babel, Supabase -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     :root {
@@ -131,26 +219,15 @@
       padding: 0;
     }
 
-    /* Glassmorphism Polish */
     .glass-panel {
-      background: rgba(15, 23, 42, 0.65);
+      background: rgba(15, 23, 42, 0.7);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--color-border);
     }
 
-    .glass-card {
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--color-border);
-    }
-
     .glow-accent {
       box-shadow: 0 0 24px -4px var(--color-accent);
-    }
-
-    .glow-soft {
-      box-shadow: 0 0 12px -2px var(--color-accent);
     }
 
     ::-webkit-scrollbar {
@@ -164,9 +241,6 @@
       background: rgba(255, 255, 255, 0.15);
       border-radius: 9999px;
     }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.3);
-    }
   </style>
 
   <script>
@@ -175,7 +249,7 @@
       if (errDiv) {
         errDiv.style.display = 'block';
         errDiv.innerHTML = '<div style="padding:20px; background:#090d16; color:#f87171; font-family:monospace; z-index:9999; position:fixed; inset:0;">' +
-          '<h2 style="font-size:18px;font-weight:bold;">NoahCord Exception Handled</h2>' +
+          '<h2>NoahCord Handled Exception</h2>' +
           '<p>' + msg + '</p>' +
           '<p>Line: ' + line + ' | Col: ' + col + '</p>' +
           '<button onclick="location.reload()" style="background:#0ea5e9;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;margin-top:12px;">Reload Application</button>' +
@@ -193,14 +267,19 @@
       <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-2xl animate-pulse mb-4 shadow-xl shadow-sky-500/30">
         NC
       </div>
-      <p class="text-gray-400 font-medium text-sm animate-pulse tracking-wide">Initializing NoahCord Experience...</p>
+      <p class="text-gray-400 font-medium text-sm animate-pulse">Loading NoahCord Experience...</p>
     </div>
   </div>
 
   <script type="text/babel">
-    const { useState, useEffect, useRef, createContext, useContext, useMemo } = React;
+    const { useState, useEffect, useRef, createContext, useContext } = React;
 
-    // --- SVG Icon Helper Component ---
+    // --- Supabase Configuration ---
+    const SUPABASE_URL = "https://hcmglicybaitjqwkqice.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbWdsaWN5YmFpdGpxd2txaWNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE2OTk5OTk5OTksImV4cCI6MjAxNTU1NTU1OX0.placeholder";
+    const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+    // --- Icon Helper ---
     const Icon = ({ name, size = 18, className = "" }) => {
       const icons = {
         hash: <path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18" />,
@@ -219,24 +298,13 @@
         logout: <g><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></g>,
         pin: <path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" />,
         paperclip: <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />,
-        anchor: <g><circle cx="12" cy="5" r="3" /><line x1="12" y1="8" x2="12" y2="21" /><path d="M5 12H2a10 10 0 0020 0h-3" /><line x1="9" y1="12" x2="15" y2="15" /></g>,
-        phone: <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />,
-        video: <g><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></g>,
         volume2: <g><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" /></g>,
         mic: <g><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" /></g>,
         micOff: <g><line x1="1" y1="1" x2="23" y2="23" /><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6" /><path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23M12 19v4M8 23h8" /></g>,
         sidebar: <g><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="3" x2="9" y2="21" /></g>,
-        image: <g><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></g>,
-        smile: <g><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" /></g>,
-        barChart: <g><line x1="12" y1="20" x2="12" y2="10" /><line x1="18" y1="20" x2="18" y2="4" /><line x1="6" y1="20" x2="6" y2="16" /></g>,
-        calendar: <g><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></g>,
         chevronDown: <polyline points="6 9 12 15 18 9" />,
         chevronRight: <polyline points="9 18 15 12 9 6" />,
-        plus: <g><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></g>,
         compass: <g><circle cx="12" cy="12" r="10" /><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" /></g>,
-        copy: <g><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></g>,
-        heart: <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />,
-        monitor: <g><rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></g>,
       };
 
       return (
@@ -246,11 +314,10 @@
       );
     };
 
-    // --- Data Models ---
+    // --- Seed Accounts & Data ---
     const SEED_ACCOUNTS = [
-      { id: 'usr-noah', username: 'Noah_', displayName: 'Noah_ (Fleet Admin)', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', banner: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800', bio: 'Founder & Fleet Architect of NoahCord. Building the next-gen web.', pronouns: 'he/him', badges: ['Fleet Admin', 'Verified', 'Founder'], password: 'admin123', customStatus: '⚓ Captain of Sailors' },
-      { id: 'usr-alex', username: 'alex_sailor', displayName: 'Alex Mercer', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', banner: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800', bio: 'UI/UX enthusiast & full-stack wizard.', pronouns: 'they/them', badges: ['Early Sailor'], password: 'sailor123', customStatus: '⛵ Cruising general' },
-      { id: 'usr-sarah', username: 'sarah_sky', displayName: 'Sarah Connor', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200', banner: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800', bio: 'Cybersec researcher & AI pioneer.', pronouns: 'she/her', badges: ['Early Sailor'], password: 'sky123', customStatus: '🎧 In Deep Focus' }
+      { id: 'usr-noah', username: 'Noah_', displayName: 'Noah_ (Fleet Admin)', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', password: 'admin123', role: 'admin', customStatus: '⚓ Fleet Captain' },
+      { id: 'usr-alex', username: 'alex_sailor', displayName: 'Alex Mercer', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', password: 'sailor123', role: 'member', customStatus: '⛵ Cruising general' }
     ];
 
     const INITIAL_CATEGORIES = [
@@ -260,32 +327,26 @@
         channels: [
           { id: 'chan-announcements', name: 'announcements', type: 'announcement', desc: 'Official updates from Noah_ & Fleet Command' },
           { id: 'chan-general', name: 'general', type: 'text', desc: 'Main deck chat for all Sailors' },
-          { id: 'chan-lounge', name: 'lounge', type: 'text', desc: 'Relax and share stories from the seas' },
-          { id: 'chan-media', name: 'media-gallery', type: 'media', desc: 'Share designs, images & media' },
-          { id: 'chan-dev', name: 'dev-ship', type: 'text', desc: 'Building NoahCord features' },
+          { id: 'chan-lounge', name: 'lounge', type: 'text', desc: 'Relax and share stories from the seas' }
         ]
       },
       {
         id: 'cat-voice',
         name: 'Voice Decks',
         channels: [
-          { id: 'chan-bridge', name: 'Captain Deck', type: 'voice', desc: 'Voice room for fleet leaders' },
-          { id: 'chan-lounge-v', name: 'Sailor Lounge', type: 'voice', desc: 'Open voice hangouts' }
+          { id: 'chan-bridge', name: 'Captain Deck', type: 'voice', desc: 'Voice room for fleet leaders' }
         ]
       }
     ];
 
     const INITIAL_MESSAGES = {
-      'chan-announcements': [
-        { id: 'm1', senderId: 'usr-noah', senderName: 'Noah_', senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', content: 'Welcome to **NoahCord**! Everyone who signs up is automatically added to **Sailors** ⚓. Try slash commands like `/poll` or `/shrug`!', timestamp: '12:00 PM', reactions: [{ emoji: '🔥', count: 4, users: ['usr-noah', 'usr-alex'] }], isPinned: true }
-      ],
       'chan-general': [
-        { id: 'm2', senderId: 'usr-alex', senderName: 'Alex Mercer', senderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', content: 'Ahoy Sailors! Glad to be aboard. Check out the glassmorphic sidebars and voice deck controls.', timestamp: '12:05 PM', reactions: [{ emoji: '⛵', count: 2, users: ['usr-alex'] }] },
-        { id: 'm3', senderId: 'usr-sarah', senderName: 'Sarah Connor', senderAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200', content: 'The dark blue accent gradients look super clean! Great work Noah.', timestamp: '12:08 PM' }
+        { id: 'm1', senderId: 'usr-noah', senderName: 'Noah_', senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', content: 'Welcome to **Sailors** ⚓! Everyone is automatically onboarded here.', timestamp: '12:00 PM' },
+        { id: 'm2', senderId: 'usr-noah', senderName: 'Noah_', senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', content: 'Notice how consecutive messages from the same sender are grouped tightly together!', timestamp: '12:01 PM' }
       ]
     };
 
-    // --- Context & State Management ---
+    // --- Context & State Provider ---
     const AppContext = createContext(null);
 
     const AppProvider = ({ children }) => {
@@ -294,9 +355,10 @@
         return saved ? JSON.parse(saved) : SEED_ACCOUNTS;
       });
 
+      // No default login! Users start unauthenticated (null)
       const [currentUser, setCurrentUser] = useState(() => {
         const saved = localStorage.getItem('noahcord_active_user');
-        return saved ? JSON.parse(saved) : SEED_ACCOUNTS[0];
+        return saved ? JSON.parse(saved) : null;
       });
 
       const [theme, setTheme] = useState(() => localStorage.getItem('noahcord_theme') || 'midnight');
@@ -312,9 +374,7 @@
       const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
       const [logoClickCount, setLogoClickCount] = useState(0);
       const [toastMsg, setToastMsg] = useState(null);
-
-      // Voice call active state
-      const [activeVoiceCall, setActiveVoiceCall] = useState(null); // { channelName, muted, deafened }
+      const [activeVoiceCall, setActiveVoiceCall] = useState(null);
 
       useEffect(() => {
         localStorage.setItem('noahcord_accounts', JSON.stringify(accounts));
@@ -339,6 +399,7 @@
         setTimeout(() => setToastMsg(null), 3500);
       };
 
+      // Noah_ 10-Click Admin Easter Egg
       const handleLogoClick = () => {
         if (!currentUser) return;
         const newCount = logoClickCount + 1;
@@ -352,12 +413,17 @@
             setIsAdminModalOpen(true);
             triggerToast('🔓 Fleet Command Admin Unlocked!');
           } else {
-            triggerToast('⛔ Access Denied! Log in as Noah_ to view panel.');
+            triggerToast('⛔ Access Denied! Security Clearance requires username: Noah_');
           }
         }
       };
 
-      const sendMessage = (channelId, text, attachment = null, pollData = null) => {
+      const logout = () => {
+        setCurrentUser(null);
+        triggerToast('Logged out successfully.');
+      };
+
+      const sendMessage = (channelId, text, pollData = null) => {
         if (!currentUser) return;
         const newMsg = {
           id: 'msg-' + Date.now(),
@@ -366,39 +432,13 @@
           senderAvatar: currentUser.avatar,
           content: text,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          attachment,
-          poll: pollData,
-          reactions: []
+          poll: pollData
         };
 
         setMessages(prev => ({
           ...prev,
           [channelId]: [...(prev[channelId] || []), newMsg]
         }));
-      };
-
-      const toggleReaction = (channelId, msgId, emoji) => {
-        setMessages(prev => {
-          const chat = prev[channelId] || [];
-          const updated = chat.map(m => {
-            if (m.id !== msgId) return m;
-            let rx = [...(m.reactions || [])];
-            const found = rx.find(r => r.emoji === emoji);
-            if (found) {
-              if (found.users.includes(currentUser.id)) {
-                found.users = found.users.filter(u => u !== currentUser.id);
-                found.count -= 1;
-              } else {
-                found.users.push(currentUser.id);
-                found.count += 1;
-              }
-            } else {
-              rx.push({ emoji, count: 1, users: [currentUser.id] });
-            }
-            return { ...m, reactions: rx.filter(r => r.count > 0) };
-          });
-          return { ...prev, [channelId]: updated };
-        });
       };
 
       const addChannel = (categoryName, channelName, desc = '') => {
@@ -411,7 +451,7 @@
           }
           return cat;
         }));
-        triggerToast(`Channel #${formatted} added to ${categoryName}!`);
+        triggerToast(`Channel #${formatted} created!`);
       };
 
       const deleteChannel = (channelId) => {
@@ -419,17 +459,17 @@
           ...cat,
           channels: cat.channels.filter(c => c.id !== channelId)
         })));
-        triggerToast('Channel removed successfully.');
+        triggerToast('Channel deleted.');
       };
 
       return (
         <AppContext.Provider value={{
           accounts, setAccounts,
-          currentUser, setCurrentUser,
+          currentUser, setCurrentUser, logout,
           theme, setTheme,
           categories, setCategories, addChannel, deleteChannel,
           activeChannelId, setActiveChannelId,
-          messages, sendMessage, toggleReaction,
+          messages, sendMessage,
           isAdminModalOpen, setIsAdminModalOpen,
           isSettingsOpen, setIsSettingsOpen,
           rightSidebarOpen, setRightSidebarOpen,
@@ -463,24 +503,22 @@
 
         if (isSignUp) {
           if (cleanUsername.length < 3) return setErrorMsg('Username must be at least 3 characters.');
-          if (isTaken) return setErrorMsg(`Username @${cleanUsername} is already taken!`);
+          if (isTaken) return setErrorMsg(`Username @${cleanUsername} is taken!`);
           if (password.length < 4) return setErrorMsg('Password must be at least 4 characters.');
 
           const newUser = {
             id: 'usr-' + Date.now(),
             username: cleanUsername,
             displayName: displayName.trim() || cleanUsername,
-            avatar: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200`,
+            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
             password: password,
-            role: cleanUsername === 'Noah_' ? 'Fleet Admin' : 'Sailor',
-            bio: 'Cruising NoahCord waters.',
-            pronouns: 'they/them',
-            badges: cleanUsername === 'Noah_' ? ['Fleet Admin', 'Verified'] : ['Sailor']
+            role: cleanUsername === 'Noah_' ? 'admin' : 'member',
+            customStatus: cleanUsername === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor'
           };
 
           setAccounts(prev => [...prev, newUser]);
           setCurrentUser(newUser);
-          triggerToast(`Welcome aboard Sailors ⚓, @${cleanUsername}!`);
+          triggerToast(`Welcome to Sailors ⚓, @${cleanUsername}!`);
         } else {
           const existing = accounts.find(a => a.username.toLowerCase() === cleanUsername.toLowerCase());
           if (!existing) return setErrorMsg(`Account @${cleanUsername} not found.`);
@@ -493,27 +531,27 @@
 
       return (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-4">
-          <div className="bg-dark-surface/90 border border-dark-border w-full max-w-md rounded-3xl p-8 shadow-2xl space-y-6 animate-fade-in glass-panel">
+          <div className="bg-[#0f172a]/90 border border-white/10 w-full max-w-md rounded-3xl p-8 shadow-2xl space-y-6 glass-panel animate-fade-in">
             <div className="text-center space-y-2">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-2xl mx-auto shadow-xl shadow-sky-500/30">
                 NC
               </div>
               <h2 className="text-2xl font-extrabold text-gray-100 tracking-tight">Welcome to NoahCord</h2>
-              <p className="text-xs text-gray-400">Join the official <span className="text-brand-400 font-semibold">Sailors ⚓</span> community server</p>
+              <p className="text-xs text-gray-400">Join the official <span className="text-sky-400 font-semibold">Sailors ⚓</span> fleet server</p>
             </div>
 
-            <div className="flex bg-dark-panel/80 p-1 rounded-xl border border-dark-border text-xs font-semibold">
+            <div className="flex bg-[#1e293b] p-1 rounded-xl border border-white/10 text-xs font-semibold">
               <button
                 type="button"
                 onClick={() => { setIsSignUp(true); setErrorMsg(''); }}
-                className={`flex-1 py-2 rounded-lg transition ${isSignUp ? 'bg-brand-500 text-white shadow' : 'text-gray-400 hover:text-gray-200'}`}
+                className={`flex-1 py-2 rounded-lg transition ${isSignUp ? 'bg-sky-500 text-white' : 'text-gray-400 hover:text-white'}`}
               >
                 Sign Up
               </button>
               <button
                 type="button"
                 onClick={() => { setIsSignUp(false); setErrorMsg(''); }}
-                className={`flex-1 py-2 rounded-lg transition ${!isSignUp ? 'bg-brand-500 text-white shadow' : 'text-gray-400 hover:text-gray-200'}`}
+                className={`flex-1 py-2 rounded-lg transition ${!isSignUp ? 'bg-sky-500 text-white' : 'text-gray-400 hover:text-white'}`}
               >
                 Log In
               </button>
@@ -543,7 +581,7 @@
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="e.g. Noah_ or sailor_jack"
-                    className="w-full bg-dark-panel border border-dark-border rounded-xl pl-8 pr-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
+                    className="w-full bg-[#1e293b] border border-white/10 rounded-xl pl-8 pr-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-sky-500"
                   />
                 </div>
               </div>
@@ -555,8 +593,8 @@
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="e.g. Sailor Jack"
-                    className="w-full mt-1 bg-dark-panel border border-dark-border rounded-xl px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
+                    placeholder="e.g. Captain Jack"
+                    className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-sky-500"
                   />
                 </div>
               )}
@@ -569,82 +607,64 @@
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full mt-1 bg-dark-panel border border-dark-border rounded-xl px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
+                  className="w-full mt-1 bg-[#1e293b] border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-sky-500"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm py-3 rounded-xl transition shadow-lg glow-accent mt-2"
+                className="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold text-sm py-3 rounded-xl transition shadow-lg mt-2"
               >
                 {isSignUp ? 'Create Account & Join Sailors ⚓' : 'Log In & Enter Sailors ⚓'}
               </button>
             </form>
 
             <div className="text-center text-[11px] text-gray-500">
-              Admin clearance: Sign up as username <span className="text-brand-400 font-mono font-bold">Noah_</span>
+              Admin clearance: Sign up as username <span className="text-sky-400 font-mono font-bold">Noah_</span>
             </div>
           </div>
         </div>
       );
     };
 
-    // --- Component: Leftmost Server Sidebar ---
+    // --- Component: Primary Left Server Navigation Bar ---
     const ServerSidebar = () => {
       const { handleLogoClick, setIsSettingsOpen } = useApp();
 
       return (
-        <div className="w-18 md:w-20 bg-dark-surface/90 border-r border-dark-border flex flex-col items-center py-4 justify-between select-none z-20 glass-panel">
+        <div className="w-18 md:w-20 bg-[#0f172a]/90 border-r border-white/10 flex flex-col items-center py-4 justify-between select-none z-20 glass-panel">
           <div className="flex flex-col items-center gap-4 w-full">
-            {/* Logo Easter Egg Button */}
             <div 
               onClick={handleLogoClick}
               className="relative group cursor-pointer"
-              title="Click 10x for Noah_ Admin Panel"
+              title="Click 10x for Noah_ Fleet Admin Panel"
             >
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xl shadow-sky-500/20 group-hover:scale-105 transition-all duration-300">
                 <span className="font-black text-xl tracking-tighter">NC</span>
               </div>
             </div>
 
-            <div className="w-8 h-[1px] bg-dark-border" />
+            <div className="w-8 h-[1px] bg-white/10" />
 
-            {/* Sailors Server Badge */}
-            <button
-              className="relative group w-12 h-12 rounded-2xl flex items-center justify-center bg-brand-500 text-white shadow-lg glow-accent scale-105"
-            >
+            <button className="relative group w-12 h-12 rounded-2xl flex items-center justify-center bg-sky-500 text-white shadow-lg scale-105">
               <span className="text-xl">⚓</span>
-              <span className="absolute left-16 bg-gray-900 text-xs px-2.5 py-1 rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                Sailors Server
-              </span>
-            </button>
-
-            {/* Discover Server Mock */}
-            <button
-              onClick={() => alert('Discover Servers: Sailors is the primary active server fleet.')}
-              className="w-12 h-12 rounded-2xl flex items-center justify-center text-gray-400 hover:bg-dark-panel hover:text-white transition"
-              title="Explore Public Servers"
-            >
-              <Icon name="compass" size={20} />
             </button>
           </div>
 
-          <div className="flex flex-col items-center gap-3">
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-3 text-gray-400 hover:text-white hover:bg-dark-panel rounded-2xl transition"
-              title="Settings & Themes"
-            >
-              <Icon name="settings" size={20} />
-            </button>
-          </div>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-3 text-gray-400 hover:text-white hover:bg-[#1e293b] rounded-2xl transition"
+            title="Settings & Themes"
+          >
+            <Icon name="settings" size={20} />
+          </button>
         </div>
       );
     };
 
-    // --- Component: Channel Panel (Voice + Categories) ---
+    // --- Component: Channels Navigation Sidebar ---
     const ChannelListSidebar = () => {
-      const { categories, activeChannelId, setActiveChannelId, currentUser, setIsAdminModalOpen, setActiveVoiceCall, activeVoiceCall } = useApp();
+      const { categories, activeChannelId, setActiveChannelId, currentUser, setIsAdminModalOpen, setActiveVoiceCall, activeVoiceCall, logout } = useApp();
       const [collapsedCat, setCollapsedCat] = useState({});
 
       const toggleCategory = (catId) => {
@@ -652,24 +672,23 @@
       };
 
       return (
-        <div className="w-60 md:w-64 bg-dark-surface/80 border-r border-dark-border flex flex-col h-full select-none glass-panel">
-          {/* Server Header */}
-          <div className="h-16 px-4 border-b border-dark-border flex items-center justify-between shadow-sm">
+        <div className="w-60 md:w-64 bg-[#0f172a]/80 border-r border-white/10 flex flex-col h-full select-none glass-panel">
+          <div className="h-16 px-4 border-b border-white/10 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-2">
               <span className="text-2xl">⚓</span>
               <div>
                 <h2 className="font-extrabold text-sm text-gray-100 tracking-wide flex items-center gap-1">
                   Sailors
-                  <Icon name="shield" size={14} className="text-brand-400" />
+                  <Icon name="shield" size={14} className="text-sky-400" />
                 </h2>
-                <p className="text-[10px] text-gray-400">Official Fleet Workspace</p>
+                <p className="text-[10px] text-gray-400">Main Community Fleet</p>
               </div>
             </div>
 
             {currentUser?.username === 'Noah_' && (
               <button 
                 onClick={() => setIsAdminModalOpen(true)} 
-                className="p-1.5 rounded-lg bg-brand-500/10 text-brand-400 hover:bg-brand-500 hover:text-white transition"
+                className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400 hover:bg-sky-500 hover:text-white transition"
                 title="Noah_ Admin Panel"
               >
                 <Icon name="crown" size={16} />
@@ -677,7 +696,6 @@
             )}
           </div>
 
-          {/* Categorized Channel List */}
           <div className="flex-1 overflow-y-auto p-3 space-y-4">
             {categories.map(cat => (
               <div key={cat.id}>
@@ -689,7 +707,7 @@
                     <Icon name={collapsedCat[cat.id] ? 'chevronRight' : 'chevronDown'} size={12} />
                     {cat.name}
                   </span>
-                  <span className="text-[10px] bg-dark-panel px-1.5 py-0.5 rounded">{cat.channels.length}</span>
+                  <span className="text-[10px] bg-[#1e293b] px-1.5 py-0.5 rounded">{cat.channels.length}</span>
                 </div>
 
                 {!collapsedCat[cat.id] && (
@@ -709,12 +727,12 @@
                           }}
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-sm transition ${
                             isActive 
-                              ? 'bg-brand-500/20 text-white font-semibold border border-brand-500/30' 
-                              : 'text-gray-400 hover:bg-dark-panel/60 hover:text-gray-200'
+                              ? 'bg-sky-500/20 text-white font-semibold border border-sky-500/30' 
+                              : 'text-gray-400 hover:bg-[#1e293b]/60 hover:text-gray-200'
                           }`}
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <Icon name={isVoice ? 'volume2' : 'hash'} size={16} className={isActive ? 'text-brand-400' : 'text-gray-500'} />
+                            <Icon name={isVoice ? 'volume2' : 'hash'} size={16} className={isActive ? 'text-sky-400' : 'text-gray-500'} />
                             <span className="truncate">{chan.name}</span>
                           </div>
                           {isVoice && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full font-bold">Voice</span>}
@@ -727,31 +745,23 @@
             ))}
           </div>
 
-          {/* Active Voice Deck Call Strip */}
+          {/* Active Voice Bar */}
           {activeVoiceCall && (
             <div className="p-3 bg-emerald-950/40 border-t border-emerald-500/30 text-xs space-y-2">
               <div className="flex items-center justify-between text-emerald-400 font-semibold">
                 <span className="flex items-center gap-1.5"><Icon name="volume2" size={14} /> Connected: {activeVoiceCall.channelName}</span>
                 <button onClick={() => setActiveVoiceCall(null)} className="hover:text-white"><Icon name="x" size={14} /></button>
               </div>
-              <div className="flex justify-around bg-dark-panel p-1.5 rounded-xl text-gray-300">
-                <button onClick={() => setActiveVoiceCall({ ...activeVoiceCall, muted: !activeVoiceCall.muted })} className={`p-1 rounded ${activeVoiceCall.muted ? 'text-rose-400' : 'hover:text-white'}`}>
-                  <Icon name={activeVoiceCall.muted ? 'micOff' : 'mic'} size={16} />
-                </button>
-                <button onClick={() => setActiveVoiceCall({ ...activeVoiceCall, deafened: !activeVoiceCall.deafened })} className={`p-1 rounded ${activeVoiceCall.deafened ? 'text-rose-400' : 'hover:text-white'}`}>
-                  <Icon name="volume2" size={16} />
-                </button>
-              </div>
             </div>
           )}
 
-          {/* User Bottom Profile Bar */}
+          {/* Bottom Logged In User Profile Banner */}
           {currentUser && (
-            <div className="p-3 bg-dark-surface/90 border-t border-dark-border flex items-center justify-between">
+            <div className="p-3 bg-[#0f172a] border-t border-white/10 flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="relative">
                   <img src={currentUser.avatar} className="w-8 h-8 rounded-xl object-cover ring-1 ring-white/10" alt="" />
-                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-dark-surface" />
+                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-[#0f172a]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-bold text-gray-200 truncate flex items-center gap-1">
@@ -761,20 +771,27 @@
                   <div className="text-[10px] text-gray-400 truncate">@{currentUser.username}</div>
                 </div>
               </div>
+
+              <button
+                onClick={logout}
+                className="p-1.5 text-gray-400 hover:text-rose-400 hover:bg-[#1e293b] rounded-lg transition"
+                title="Log Out"
+              >
+                <Icon name="logout" size={16} />
+              </button>
             </div>
           )}
         </div>
       );
     };
 
-    // --- Component: Main Chat Area ---
+    // --- Component: Main Chat Window (Compact Consecutive Messages) ---
     const ChatWindow = () => {
-      const { categories, activeChannelId, messages, sendMessage, toggleReaction, currentUser, rightSidebarOpen, setRightSidebarOpen } = useApp();
+      const { categories, activeChannelId, messages, sendMessage, rightSidebarOpen, setRightSidebarOpen } = useApp();
       const [input, setInput] = useState('');
       const [showSlashMenu, setShowSlashMenu] = useState(false);
       const chatEndRef = useRef(null);
 
-      // Find Active Channel
       let activeChan = null;
       categories.forEach(cat => {
         const found = cat.channels.find(c => c.id === activeChannelId);
@@ -788,26 +805,15 @@
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, [chanMessages.length]);
 
-      const handleInput = (e) => {
-        const val = e.target.value;
-        setInput(val);
-        setShowSlashMenu(val.startsWith('/'));
-      };
-
       const handleSend = (e) => {
         e?.preventDefault();
         if (!input.trim()) return;
 
-        // Slash command parsing
         if (input.startsWith('/poll')) {
           const parts = input.replace('/poll', '').split('|').map(s => s.trim()).filter(Boolean);
           const question = parts[0] || 'Community Poll';
           const options = parts.slice(1).length > 0 ? parts.slice(1) : ['Option A', 'Option B'];
-          sendMessage(activeChan.id, `📊 **POLL:** ${question}`, null, { question, options, votes: {} });
-        } else if (input === '/shrug') {
-          sendMessage(activeChan.id, '¯\\_(ツ)_/¯');
-        } else if (input === '/tableflip') {
-          sendMessage(activeChan.id, '(╯°□°)╯︵ ┻━┻');
+          sendMessage(activeChan.id, `📊 **POLL:** ${question}`, { question, options });
         } else {
           sendMessage(activeChan.id, input);
         }
@@ -817,241 +823,146 @@
       };
 
       return (
-        <div className="flex-1 flex flex-col h-full bg-dark-bg relative overflow-hidden">
-          {/* Chat Header Bar */}
-          <div className="h-16 border-b border-dark-border px-6 flex items-center justify-between bg-dark-surface/40 backdrop-blur-md">
+        <div className="flex-1 flex flex-col h-full bg-[#080b12] relative overflow-hidden">
+          <div className="h-16 border-b border-white/10 px-6 flex items-center justify-between bg-[#0f172a]/40 backdrop-blur-md">
             <div className="flex items-center gap-2">
-              <Icon name={activeChan?.type === 'voice' ? 'volume2' : 'hash'} className="text-brand-400" size={22} />
+              <Icon name={activeChan?.type === 'voice' ? 'volume2' : 'hash'} className="text-sky-400" size={22} />
               <div>
-                <h3 className="font-bold text-gray-100 text-sm flex items-center gap-2">
-                  {activeChan?.name}
-                </h3>
+                <h3 className="font-bold text-gray-100 text-sm">{activeChan?.name}</h3>
                 <p className="text-xs text-gray-400">{activeChan?.desc}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-                className={`p-2 rounded-xl transition ${rightSidebarOpen ? 'bg-brand-500/20 text-brand-400' : 'text-gray-400 hover:text-white hover:bg-dark-panel'}`}
-                title="Toggle Right Sidebar"
-              >
-                <Icon name="sidebar" size={18} />
-              </button>
-            </div>
+            <button 
+              onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
+              className={`p-2 rounded-xl transition ${rightSidebarOpen ? 'bg-sky-500/20 text-sky-400' : 'text-gray-400 hover:text-white'}`}
+            >
+              <Icon name="sidebar" size={18} />
+            </button>
           </div>
 
-          {/* Message Stream */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {chanMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
-                <div className="w-16 h-16 rounded-3xl bg-dark-panel flex items-center justify-center text-brand-500 mb-2">
-                  <Icon name="hash" size={32} />
-                </div>
-                <p className="font-semibold text-gray-300">Welcome to #{activeChan?.name}!</p>
-                <p className="text-xs text-gray-500 mt-1">This is the beginning of the #{activeChan?.name} channel.</p>
-              </div>
-            ) : (
-              chanMessages.map((msg, idx) => {
-                const prevMsg = chanMessages[idx - 1];
-                const isGrouped = prevMsg && prevMsg.senderId === msg.senderId;
+          {/* Compact Grouped Message Stream */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-1">
+            {chanMessages.map((msg, idx) => {
+              const prevMsg = chanMessages[idx - 1];
+              const isGrouped = prevMsg && prevMsg.senderId === msg.senderId;
 
-                return (
-                  <div key={msg.id} className={`group relative flex gap-3 hover:bg-dark-panel/30 px-3 py-1.5 rounded-2xl transition duration-150 ${isGrouped ? 'mt-0.5' : 'mt-3'}`}>
-                    {!isGrouped ? (
-                      <img src={msg.senderAvatar} className="w-10 h-10 rounded-2xl object-cover ring-1 ring-white/10" alt="" />
-                    ) : (
-                      <div className="w-10 text-[10px] text-gray-600 text-right pr-2 opacity-0 group-hover:opacity-100 select-none">
-                        {msg.timestamp}
+              return (
+                <div key={msg.id} className={`group relative flex gap-3 hover:bg-[#1e293b]/30 px-3 py-1 rounded-xl transition duration-150 ${isGrouped ? 'mt-0.5' : 'mt-3.5'}`}>
+                  {!isGrouped ? (
+                    <img src={msg.senderAvatar} className="w-9 h-9 rounded-xl object-cover ring-1 ring-white/10" alt="" />
+                  ) : (
+                    <div className="w-9 text-[10px] text-gray-600 text-right pr-2 opacity-0 group-hover:opacity-100 select-none pt-0.5">
+                      {msg.timestamp}
+                    </div>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    {!isGrouped && (
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="font-bold text-xs text-gray-200">{msg.senderName}</span>
+                        {msg.senderName.includes('Noah_') && <span className="bg-sky-500/20 text-sky-400 text-[10px] px-1.5 py-0.2 rounded font-semibold">Fleet Admin</span>}
+                        <span className="text-[10px] text-gray-500">{msg.timestamp}</span>
                       </div>
                     )}
 
-                    <div className="flex-1 min-w-0">
-                      {!isGrouped && (
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="font-bold text-sm text-gray-200">{msg.senderName}</span>
-                          {msg.senderName.includes('Noah_') && <span className="bg-brand-500/20 text-brand-400 text-[10px] px-1.5 py-0.5 rounded font-semibold">Fleet Admin</span>}
-                          <span className="text-[10px] text-gray-500">{msg.timestamp}</span>
-                        </div>
-                      )}
+                    <div className="text-xs text-gray-300 leading-snug break-words">{msg.content}</div>
 
-                      <div className="text-sm text-gray-300 leading-relaxed break-words">{msg.content}</div>
-
-                      {/* Poll View */}
-                      {msg.poll && (
-                        <div className="mt-3 bg-dark-surface border border-dark-border p-4 rounded-2xl max-w-md space-y-2">
-                          <div className="font-bold text-xs text-brand-400 uppercase tracking-wider">Poll: {msg.poll.question}</div>
-                          <div className="space-y-1.5">
-                            {msg.poll.options.map((opt, i) => (
-                              <button key={i} onClick={() => alert(`Voted for ${opt}`)} className="w-full text-left text-xs bg-dark-panel hover:bg-brand-500/20 p-2 rounded-xl transition border border-dark-border flex justify-between">
-                                <span>{opt}</span>
-                                <span className="text-gray-500 font-mono">0 votes</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Reactions */}
-                      {msg.reactions && msg.reactions.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {msg.reactions.map((r, i) => (
-                            <button
-                              key={i}
-                              onClick={() => toggleReaction(activeChan.id, msg.id, r.emoji)}
-                              className={`text-xs px-2 py-0.5 rounded-lg border flex items-center gap-1 transition ${
-                                r.users.includes(currentUser.id) ? 'bg-brand-500/20 border-brand-500/40 text-brand-300 font-semibold' : 'bg-dark-panel/60 border-dark-border text-gray-400'
-                              }`}
-                            >
-                              <span>{r.emoji}</span>
-                              <span>{r.count}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Floating Hover Action Bar */}
-                    <div className="absolute right-3 -top-3 opacity-0 group-hover:opacity-100 transition bg-dark-surface border border-dark-border rounded-xl shadow-xl p-1 flex items-center gap-1">
-                      {['🔥', '⛵', '❤️'].map(emoji => (
-                        <button key={emoji} onClick={() => toggleReaction(activeChan.id, msg.id, emoji)} className="p-1 hover:bg-dark-panel rounded-lg text-xs">{emoji}</button>
-                      ))}
-                    </div>
+                    {msg.poll && (
+                      <div className="mt-2 bg-[#0f172a] border border-white/10 p-3 rounded-xl max-w-sm space-y-1">
+                        <div className="font-bold text-xs text-sky-400">POLL: {msg.poll.question}</div>
+                        {msg.poll.options.map((opt, i) => (
+                          <button key={i} className="w-full text-left text-xs bg-[#1e293b] p-1.5 rounded-lg border border-white/5 flex justify-between">
+                            <span>{opt}</span>
+                            <span className="text-gray-500 font-mono">0 votes</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                );
-              })
-            )}
+                </div>
+              );
+            })}
             <div ref={chatEndRef} />
           </div>
 
-          {/* Slash Commands Drawer */}
-          {showSlashMenu && (
-            <div className="absolute bottom-20 left-6 bg-dark-surface border border-dark-border p-2 rounded-2xl shadow-2xl space-y-1 z-30 animate-slide-up w-64 glass-panel">
-              <div className="text-[10px] font-bold text-gray-500 uppercase px-2 py-1">Slash Commands</div>
-              <div onClick={() => { setInput('/poll Question | Opt1 | Opt2'); setShowSlashMenu(false); }} className="px-3 py-2 text-xs hover:bg-dark-panel rounded-xl cursor-pointer">/poll Question | Opt1 | Opt2</div>
-              <div onClick={() => { setInput('/shrug'); setShowSlashMenu(false); }} className="px-3 py-2 text-xs hover:bg-dark-panel rounded-xl cursor-pointer">/shrug — ¯\_(ツ)_/¯</div>
-              <div onClick={() => { setInput('/tableflip'); setShowSlashMenu(false); }} className="px-3 py-2 text-xs hover:bg-dark-panel rounded-xl cursor-pointer">/tableflip — (╯°□°)╯︵ ┻━┻</div>
-            </div>
-          )}
-
-          {/* Chat Input Dock */}
-          <div className="p-4 bg-dark-surface/40 backdrop-blur-md border-t border-dark-border">
-            <form onSubmit={handleSend} className="flex items-center bg-dark-surface border border-dark-border rounded-2xl p-2 focus-within:border-brand-500 transition shadow-inner">
+          <div className="p-4 bg-[#0f172a]/40 backdrop-blur-md border-t border-white/10">
+            <form onSubmit={handleSend} className="flex items-center bg-[#0f172a] border border-white/10 rounded-2xl p-2 focus-within:border-sky-500 transition shadow-inner">
               <input
                 type="text"
                 value={input}
-                onChange={handleInput}
-                placeholder={`Message #${activeChan?.name} (Try /poll or /shrug)...`}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  setShowSlashMenu(e.target.value.startsWith('/'));
+                }}
+                placeholder={`Message #${activeChan?.name} in Sailors...`}
                 className="flex-1 bg-transparent px-3 text-sm text-gray-100 placeholder-gray-500 focus:outline-none"
               />
-
-              <div className="flex items-center gap-1">
-                <button
-                  type="submit"
-                  disabled={!input.trim()}
-                  className="p-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-white transition shadow-md glow-accent"
-                >
-                  <Icon name="send" size={16} />
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={!input.trim()}
+                className="p-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white transition shadow-md"
+              >
+                <Icon name="send" size={16} />
+              </button>
             </form>
           </div>
         </div>
       );
     };
 
-    // --- Component: Right Sidebar (Members, Info & Pinned) ---
+    // --- Component: Right Sidebar (Members List) ---
     const RightSidebar = () => {
-      const { rightSidebarOpen, accounts, currentUser } = useApp();
-      const [tab, setTab] = useState('members');
+      const { rightSidebarOpen, accounts } = useApp();
 
       if (!rightSidebarOpen) return null;
 
       return (
-        <div className="w-64 md:w-72 bg-dark-surface/80 border-l border-dark-border flex flex-col h-full select-none glass-panel animate-slide-left">
-          {/* Header Tabs */}
-          <div className="h-16 border-b border-dark-border px-4 flex items-center justify-around text-xs font-semibold">
-            {['members', 'pinned'].map(t => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`py-1.5 px-3 rounded-lg capitalize transition ${tab === t ? 'bg-brand-500/20 text-brand-400 font-bold' : 'text-gray-400 hover:text-white'}`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {tab === 'members' ? (
-              <div>
-                <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Fleet Crew — {accounts.length}</div>
-                <div className="space-y-2">
-                  {accounts.map(usr => (
-                    <div key={usr.id} className="p-2.5 bg-dark-panel/40 border border-dark-border rounded-2xl flex items-center gap-3 hover:border-brand-500/30 transition">
-                      <div className="relative">
-                        <img src={usr.avatar} className="w-10 h-10 rounded-xl object-cover" alt="" />
-                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-dark-surface" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold text-gray-200 truncate flex items-center gap-1">
-                          {usr.displayName}
-                          {usr.username === 'Noah_' && <Icon name="crown" size={12} className="text-amber-400" />}
-                        </div>
-                        <div className="text-[10px] text-gray-400 truncate">@{usr.username}</div>
-                        <div className="text-[10px] text-brand-400 truncate mt-0.5">{usr.customStatus}</div>
-                      </div>
-                    </div>
-                  ))}
+        <div className="w-60 bg-[#0f172a]/80 border-l border-white/10 flex flex-col h-full select-none glass-panel p-4 space-y-4">
+          <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Fleet Crew — {accounts.length}</div>
+          <div className="space-y-2 overflow-y-auto">
+            {accounts.map(usr => (
+              <div key={usr.id} className="p-2 bg-[#1e293b]/40 border border-white/5 rounded-2xl flex items-center gap-2.5">
+                <div className="relative">
+                  <img src={usr.avatar} className="w-8 h-8 rounded-xl object-cover" alt="" />
+                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 border border-[#0f172a]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-gray-200 truncate flex items-center gap-1">
+                    {usr.displayName}
+                    {usr.username === 'Noah_' && <Icon name="crown" size={12} className="text-amber-400" />}
+                  </div>
+                  <div className="text-[10px] text-gray-400 truncate">@{usr.username}</div>
                 </div>
               </div>
-            ) : (
-              <div className="text-xs text-gray-400 italic text-center py-6">
-                No pinned messages in this channel yet.
-              </div>
-            )}
+            ))}
           </div>
         </div>
       );
     };
 
-    // --- Component: Noah_ Secret Admin Panel Modal ---
+    // --- Component: Admin Panel Modal (Noah_ Only) ---
     const AdminPanelModal = () => {
       const { isAdminModalOpen, setIsAdminModalOpen, categories, addChannel, deleteChannel, currentUser } = useApp();
       const [catName, setCatName] = useState('Deck Operations');
       const [chanName, setChanName] = useState('');
-      const [chanDesc, setChanDesc] = useState('');
 
       if (!isAdminModalOpen) return null;
 
-      const handleCreate = (e) => {
-        e.preventDefault();
-        if (!chanName.trim()) return;
-        addChannel(catName, chanName, chanDesc);
-        setChanName('');
-        setChanDesc('');
-      };
-
       return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-dark-surface border border-brand-500/40 w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-6 glass-panel">
-            <div className="flex items-center justify-between pb-4 border-b border-dark-border">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400">
-                  <Icon name="crown" size={24} />
-                </div>
-                <div>
-                  <h2 className="font-extrabold text-lg text-gray-100">Sailors Fleet Command Admin Panel</h2>
-                  <p className="text-xs text-brand-400">Super Administrator Access Granted to @{currentUser?.username}</p>
-                </div>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0f172a] border border-sky-500/40 w-full max-w-xl rounded-3xl p-6 shadow-2xl space-y-6 glass-panel">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Icon name="crown" size={20} className="text-amber-400" />
+                <h2 className="font-extrabold text-lg text-gray-100">Sailors Admin Panel (@{currentUser?.username})</h2>
               </div>
-              <button onClick={() => setIsAdminModalOpen(false)} className="p-1 rounded-xl text-gray-400 hover:text-white"><Icon name="x" size={20} /></button>
+              <button onClick={() => setIsAdminModalOpen(false)} className="text-gray-400 hover:text-white"><Icon name="x" size={20} /></button>
             </div>
 
-            <form onSubmit={handleCreate} className="bg-dark-panel/60 p-4 rounded-2xl border border-dark-border space-y-3">
-              <h3 className="text-xs font-bold text-gray-300 uppercase tracking-wider">Add Channel to Sailors</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <select value={catName} onChange={(e) => setCatName(e.target.value)} className="bg-dark-surface border border-dark-border rounded-xl px-3 py-2 text-xs text-gray-100">
+            <form onSubmit={(e) => { e.preventDefault(); if (chanName) { addChannel(catName, chanName); setChanName(''); } }} className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <select value={catName} onChange={(e) => setCatName(e.target.value)} className="bg-[#1e293b] border border-white/10 rounded-xl p-2 text-xs text-gray-100">
                   {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
                 <input
@@ -1059,81 +970,53 @@
                   placeholder="channel-name"
                   value={chanName}
                   onChange={(e) => setChanName(e.target.value)}
-                  className="bg-dark-surface border border-dark-border rounded-xl px-3 py-2 text-xs text-gray-100"
-                />
-                <input
-                  type="text"
-                  placeholder="Channel Topic Description"
-                  value={chanDesc}
-                  onChange={(e) => setChanDesc(e.target.value)}
-                  className="bg-dark-surface border border-dark-border rounded-xl px-3 py-2 text-xs text-gray-100"
+                  className="bg-[#1e293b] border border-white/10 rounded-xl p-2 text-xs text-gray-100"
                 />
               </div>
-              <button
-                type="submit"
-                className="w-full bg-brand-500 hover:bg-brand-600 text-white font-semibold text-xs py-2.5 rounded-xl transition glow-accent"
-              >
-                + Add Channel
-              </button>
+              <button type="submit" className="w-full bg-sky-500 hover:bg-sky-600 text-white font-semibold text-xs py-2 rounded-xl">+ Add Channel</button>
             </form>
           </div>
         </div>
       );
     };
 
-    // --- Component: Settings & Theme Picker Modal ---
+    // --- Settings Modal ---
     const SettingsModal = () => {
-      const { isSettingsOpen, setIsSettingsOpen, theme, setTheme, currentUser, setCurrentUser, triggerToast } = useApp();
+      const { isSettingsOpen, setIsSettingsOpen, theme, setTheme, triggerToast } = useApp();
 
       if (!isSettingsOpen) return null;
 
-      const themes = [
-        { id: 'midnight', name: 'Midnight Dark', color: '#38bdf8' },
-        { id: 'black', name: 'Pitch Black', color: '#22d3ee' },
-        { id: 'dark-blue', name: 'Deep Navy', color: '#60a5fa' },
-        { id: 'cyan-neon', name: 'Cyan Neon', color: '#2dd4bf' },
-        { id: 'pink', name: 'Heart Pink', color: '#f43f5e' }
-      ];
-
       return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-dark-surface border border-dark-border w-full max-w-xl rounded-3xl p-6 shadow-2xl space-y-6 glass-panel">
-            <div className="flex items-center justify-between pb-4 border-b border-dark-border">
-              <h2 className="font-extrabold text-lg text-gray-100">Preferences & Themes</h2>
-              <button onClick={() => setIsSettingsOpen(false)} className="p-1 rounded-xl text-gray-400 hover:text-white"><Icon name="x" size={20} /></button>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0f172a] border border-white/10 w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 glass-panel">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <h2 className="font-extrabold text-lg text-gray-100">Theme Selector</h2>
+              <button onClick={() => setIsSettingsOpen(false)} className="text-gray-400 hover:text-white"><Icon name="x" size={20} /></button>
             </div>
-
-            <div className="space-y-4">
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Accent Theme Preset</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {themes.map(t => (
-                  <button
-                    key={t.id}
-                    onClick={() => { setTheme(t.id); triggerToast(`Theme set to ${t.name}`); }}
-                    className={`p-3 rounded-2xl border text-left flex items-center justify-between transition ${
-                      theme === t.id ? 'border-brand-500 bg-brand-500/10 font-bold' : 'border-dark-border hover:border-gray-600'
-                    }`}
-                  >
-                    <span className="text-xs text-gray-200">{t.name}</span>
-                    <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: t.color }} />
-                  </button>
-                ))}
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              {['midnight', 'black', 'dark-blue', 'cyan-neon', 'pink'].map(t => (
+                <button
+                  key={t}
+                  onClick={() => { setTheme(t); triggerToast(`Theme: ${t}`); }}
+                  className={`p-3 rounded-xl border capitalize text-xs text-left ${theme === t ? 'border-sky-500 bg-sky-500/10 font-bold' : 'border-white/10'}`}
+                >
+                  {t}
+                </button>
+              ))}
             </div>
           </div>
         </div>
       );
     };
 
-    // --- Main Layout Component ---
+    // --- Main Layout ---
     const MainApp = () => {
       const { currentUser, toastMsg } = useApp();
 
       return (
-        <div className="flex h-screen w-screen overflow-hidden bg-dark-bg text-gray-100 relative">
-          {/* Toast Notification Banner */}
+        <div className="flex h-screen w-screen overflow-hidden bg-[#080b12] text-gray-100 relative">
           {toastMsg && (
-            <div className="absolute top-4 right-4 bg-brand-500 text-white px-4 py-2.5 rounded-2xl shadow-2xl z-50 text-xs font-bold animate-bounce-subtle flex items-center gap-2 border border-white/20">
+            <div className="absolute top-4 right-4 bg-sky-500 text-white px-4 py-2 rounded-2xl shadow-2xl z-50 text-xs font-bold border border-white/20">
               <Icon name="sparkles" size={16} /> {toastMsg}
             </div>
           )}
@@ -1156,7 +1039,6 @@
       );
     };
 
-    // --- Render Root ---
     ReactDOM.createRoot(document.getElementById('root')).render(
       <AppProvider>
         <MainApp />
