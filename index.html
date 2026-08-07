@@ -1,22 +1,9 @@
-The chat disappeared because msg.senderName.includes('Noah_') threw a silent
-JavaScript error when a message's sender name wasn't populated from Supabase,
-causing React's render tree to crash.
-
-(The Cloudflare __cf_bm cookie warning in your console is harmless and comes
-from loading Babel via CDN).
-
-Complete Fixed index.html
-
-This update fixes the crash with safe optional chaining
-(msg.senderName?.includes(...)), adds a Welcome Banner when a channel is empty,
-and prevents any missing database fields from hiding the chat:
-
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>NoahCord — Premium Messaging Platform</title>
+  <title>NoahCord — Next-Gen Messaging Platform</title>
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -186,7 +173,16 @@ and prevents any missing database fields from hiding the chat:
   <script type="text/babel">
     const { useState, useEffect, useRef, createContext, useContext } = React;
 
-    // --- Live Supabase Setup ---
+    // --- Helper function for RFC4122 Compliant UUID Generation ---
+    function generateUUID() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    // --- Live Supabase Client Setup ---
     const SUPABASE_URL = "https://hcmglicybaitjqwkqice.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbWdsaWN5YmFpdGpxd2txaWNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMTAzMzAsImV4cCI6MjEwMTY4NjMzMH0.oIovdQqvUEKiAAfhkT9-sRCYNyjmcWCM-jglidYVA-4";
     const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -242,19 +238,14 @@ and prevents any missing database fields from hiding the chat:
     ];
 
     const DEFAULT_ACCOUNTS = [
-      { id: 'usr-noah', username: 'Noah_', displayName: 'Noah_ (Fleet Admin)', password: 'admin123', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', role: 'admin', customStatus: '⚓ Fleet Captain' },
-      { id: 'usr-alex', username: 'alex_sailor', displayName: 'Alex Mercer', password: 'sailor123', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', role: 'member', customStatus: '⛵ Sailor' }
+      { id: '343e0618-0000-4000-a000-000000000001', username: 'Noah_', displayName: 'Noah_ (Fleet Admin)', password: 'admin123', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', role: 'admin', customStatus: '⚓ Fleet Captain' },
+      { id: '343e0618-0000-4000-a000-000000000002', username: 'alex_sailor', displayName: 'Alex Mercer', password: 'sailor123', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', role: 'member', customStatus: '⛵ Sailor' }
     ];
-
-    const DEFAULT_MESSAGES = {
-      'chan-general': [
-        { id: 'm1', senderId: 'usr-noah', senderName: 'Noah_', senderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', content: 'Welcome to **Sailors** ⚓! Send a message below to test live chat.', timestamp: '12:00 PM' }
-      ]
-    };
 
     const AppContext = createContext(null);
 
     const AppProvider = ({ children }) => {
+      // Session Persistence
       const [currentUser, setCurrentUser] = useState(() => {
         const saved = localStorage.getItem('noahcord_active_session');
         return saved ? JSON.parse(saved) : null;
@@ -269,10 +260,7 @@ and prevents any missing database fields from hiding the chat:
       const [categories, setCategories] = useState(INITIAL_CATEGORIES);
       const [activeChannelId, setActiveChannelId] = useState('chan-general');
 
-      const [messages, setMessages] = useState(() => {
-        const saved = localStorage.getItem('noahcord_saved_messages');
-        return saved ? JSON.parse(saved) : DEFAULT_MESSAGES;
-      });
+      const [messages, setMessages] = useState({});
 
       const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
       const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -290,14 +278,26 @@ and prevents any missing database fields from hiding the chat:
       useEffect(() => {
         if (currentUser) {
           localStorage.setItem('noahcord_active_session', JSON.stringify(currentUser));
+          // Auto-upsert profile to Supabase to prevent Foreign Key blocks
+          ensureSupabaseProfile(currentUser);
         } else {
           localStorage.removeItem('noahcord_active_session');
         }
       }, [currentUser]);
 
-      useEffect(() => {
-        localStorage.setItem('noahcord_saved_messages', JSON.stringify(messages));
-      }, [messages]);
+      // Auto-upsert user profile to Supabase DB so message foreign key constraint passes
+      const ensureSupabaseProfile = async (userObj) => {
+        if (!supabase || !userObj) return;
+        
+        await supabase.from('profiles').upsert({
+          id: userObj.id,
+          username: userObj.username,
+          display_name: userObj.displayName || userObj.username,
+          avatar_url: userObj.avatar,
+          custom_status: userObj.customStatus || '⛵ Sailor',
+          role: userObj.role || 'member'
+        });
+      };
 
       // Restore Supabase Auth Session
       useEffect(() => {
@@ -337,7 +337,7 @@ and prevents any missing database fields from hiding the chat:
         }
       };
 
-      // Realtime Database Sync
+      // Multi-Device Live Realtime Sync
       useEffect(() => {
         if (!currentUser || !supabase) return;
 
@@ -355,34 +355,31 @@ and prevents any missing database fields from hiding the chat:
           }
 
           const { data: msgs } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
-          if (msgs && msgs.length > 0) {
-            setMessages(prev => {
-              const updated = { ...prev };
-              msgs.forEach(m => {
-                const chanKey = m.channel_id || 'chan-general';
-                if (!updated[chanKey]) updated[chanKey] = [];
-                
-                if (!updated[chanKey].some(existing => existing.id === m.id)) {
-                  const sender = profs?.find(p => p.id === m.sender_id);
-                  updated[chanKey].push({
-                    id: m.id,
-                    senderId: m.sender_id,
-                    senderName: sender ? (sender.display_name || sender.username) : 'Sailor',
-                    senderAvatar: sender?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-                    content: m.content || '',
-                    timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    poll: m.poll_data
-                  });
-                }
+          if (msgs) {
+            const grouped = {};
+            msgs.forEach(m => {
+              const chanKey = m.channel_id || 'chan-general';
+              if (!grouped[chanKey]) grouped[chanKey] = [];
+              
+              const sender = profs?.find(p => p.id === m.sender_id);
+              grouped[chanKey].push({
+                id: m.id,
+                senderId: m.sender_id,
+                senderName: sender ? (sender.display_name || sender.username) : 'Sailor',
+                senderAvatar: sender?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+                content: m.content || '',
+                timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                poll: m.poll_data
               });
-              return updated;
             });
+            setMessages(grouped);
           }
         };
 
         loadMessagesAndProfiles();
 
-        const channel = supabase.channel('public:messages')
+        // Subscribe to live WebSocket messages broadcast across devices
+        const channel = supabase.channel('messages_realtime_broadcast')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
             loadMessagesAndProfiles();
           })
@@ -450,11 +447,14 @@ and prevents any missing database fields from hiding the chat:
         triggerToast('Profile updated!');
       };
 
+      // Multi-Device Instant Broadcast
       const sendMessage = async (channelId, text, pollData = null) => {
         if (!currentUser) return;
 
+        const newMsgId = generateUUID(); // Valid RFC4122 UUID for Postgres
+
         const newMsg = {
-          id: 'msg-' + Date.now(),
+          id: newMsgId,
           senderId: currentUser.id,
           senderName: currentUser.displayName || currentUser.username || 'Sailor',
           senderAvatar: currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
@@ -463,22 +463,27 @@ and prevents any missing database fields from hiding the chat:
           poll: pollData
         };
 
-        // Instant Optimistic Local Render
+        // Instant local update
         setMessages(prev => ({
           ...prev,
           [channelId]: [...(prev[channelId] || []), newMsg]
         }));
 
-        // Sync with Supabase
-        if (supabase && currentUser.id) {
-          const payload = {
+        // Send to Supabase DB for cross-device sync
+        if (supabase) {
+          await ensureSupabaseProfile(currentUser);
+
+          const { error } = await supabase.from('messages').insert({
+            id: newMsgId,
             channel_id: channelId,
             sender_id: currentUser.id,
             content: text,
             poll_data: pollData
-          };
+          });
 
-          await supabase.from('messages').insert(payload);
+          if (error) {
+            console.error('Supabase Sync Error:', error.message);
+          }
         }
       };
 
@@ -548,15 +553,7 @@ and prevents any missing database fields from hiding the chat:
               throw new Error(`Username @${cleanUser} is already registered! Please switch to Log In.`);
             }
 
-            let newProfile = {
-              id: 'usr-' + Date.now(),
-              username: cleanUser,
-              displayName: displayName.trim() || cleanUser,
-              password: password,
-              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-              role: cleanUser === 'Noah_' ? 'admin' : 'member',
-              customStatus: cleanUser === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor'
-            };
+            let userId = generateUUID(); // RFC4122 Valid UUID
 
             if (supabase) {
               const { data } = await supabase.auth.signUp({
@@ -565,9 +562,19 @@ and prevents any missing database fields from hiding the chat:
                 options: { data: { username: cleanUser, display_name: displayName.trim() || cleanUser } }
               });
               if (data?.user) {
-                newProfile.id = data.user.id;
+                userId = data.user.id;
               }
             }
+
+            const newProfile = {
+              id: userId,
+              username: cleanUser,
+              displayName: displayName.trim() || cleanUser,
+              password: password,
+              avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+              role: cleanUser === 'Noah_' ? 'admin' : 'member',
+              customStatus: cleanUser === 'Noah_' ? '⚓ Fleet Captain' : '⛵ Sailor'
+            };
 
             setAccounts(prev => [...prev, newProfile]);
             setCurrentUser(newProfile);
@@ -810,7 +817,7 @@ and prevents any missing database fields from hiding the chat:
             </div>
           )}
 
-          {/* User Bottom Card */}
+          {/* User Profile Banner */}
           {currentUser && (
             <div className="p-3 bg-[#0f172a] border-t border-white/10 flex items-center justify-between">
               <div 
@@ -1029,7 +1036,7 @@ and prevents any missing database fields from hiding the chat:
       );
     };
 
-    // --- Profile Modal ---
+    // --- User Profile Modal ---
     const ProfileModal = () => {
       const { isProfileModalOpen, setIsProfileModalOpen, currentUser, updateProfile, theme, setTheme } = useApp();
       
@@ -1218,7 +1225,7 @@ and prevents any missing database fields from hiding the chat:
                 <ChannelListSidebar />
               </div>
 
-              {/* Main Workspace */}
+              {/* Main Workspace Workspace */}
               <div className="flex-1 flex h-full overflow-hidden w-full">
                 <ChatWindow />
 
